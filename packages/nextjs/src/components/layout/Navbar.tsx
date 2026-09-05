@@ -1,12 +1,11 @@
 import { Link, useLocation } from 'react-router-dom';
+import { NetworkSwitcher } from '@/components/wallet/NetworkSwitcher';
 import { ConnectWalletButton } from '@/components/wallet/ConnectWalletButton';
 import { cn } from '@/lib/utils';
 
 const navLinks = [
   { href: '/', label: 'Trade' },
   { href: '/portfolio', label: 'Portfolio' },
-  { href: '#', label: 'Docs' },
-  { href: '#', label: 'About' },
 ];
 
 export function Navbar() {
@@ -25,7 +24,7 @@ export function Navbar() {
               <span className="font-heading font-semibold text-lg text-foreground">TradeLayer</span>
             </div>
             <span className="px-2 py-0.5 text-xs font-medium bg-primary/20 text-primary rounded-full">
-              Beta
+              Hedera
             </span>
           </Link>
 
@@ -47,8 +46,11 @@ export function Navbar() {
             ))}
           </div>
 
-          {/* Connect Wallet */}
-          <ConnectWalletButton />
+          {/* Wallet + network */}
+          <div className="flex items-center gap-2">
+            <NetworkSwitcher />
+            <ConnectWalletButton />
+          </div>
         </div>
       </div>
     </nav>

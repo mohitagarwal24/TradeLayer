@@ -1,24 +1,29 @@
-import { TradingCard } from '@/components/trade/TradingCard';
+import { TradingPanel } from "@/components/trade/TradingPanel";
+import { MarketTicker } from "@/components/trade/MarketTicker";
 
 const Index = () => {
   return (
     <main className="min-h-screen pt-24 pb-16">
       <div className="container mx-auto px-4">
-        {/* Hero Section */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold mb-4 text-balance">
+        {/* Hero */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl md:text-5xl font-heading font-bold mb-3 text-balance">
             Trade real-world assets
             <br />
             <span className="gradient-text">with crypto.</span>
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
-            TradeLayer unifies stock markets and crypto liquidity into one private trading layer.
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto text-balance mb-6">
+            Escrowed equity orders, oracle-settled on-chain. Your positions are yours — DSTOCK cannot be transferred
+            out from under you.
           </p>
+          <MarketTicker />
         </div>
 
-        {/* Trading Card */}
+        {/* Trading */}
         <div className="flex justify-center">
-          <TradingCard />
+          <div className="w-full max-w-md">
+            <TradingPanel />
+          </div>
         </div>
       </div>
     </main>

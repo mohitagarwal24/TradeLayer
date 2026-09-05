@@ -7,7 +7,6 @@ import { WagmiProvider } from "wagmi";
 import { config } from "@/lib/wagmi";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { FloatingOrbs } from "@/components/layout/FloatingOrbs";
 import Index from "./pages/Index";
 import Portfolio from "./pages/Portfolio";
 import NotFound from "./pages/NotFound";
@@ -22,7 +21,6 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <div className="relative min-h-screen flex flex-col">
-            <FloatingOrbs />
             <Navbar />
             <div className="flex-1">
               <Routes>
