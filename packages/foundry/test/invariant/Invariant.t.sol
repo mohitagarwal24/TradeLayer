@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {TradeLayer} from "../../contracts/TradeLayer.sol";
-import {MockUSDC} from "../MockUSDC.sol";
+import {MockUSDC} from "../../contracts/mocks/MockUSDC.sol";
 import {Handler} from "./Handler.t.sol";
 
 contract TradeLayerInvariantTest is Test {

@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {TradeLayer} from "../../contracts/TradeLayer.sol";
-import {MockUSDC} from "../MockUSDC.sol";
+import {MockUSDC} from "../../contracts/mocks/MockUSDC.sol";
 import {console} from "forge-std/console.sol";
 
 /// @dev Handler for stateful invariant fuzzing.

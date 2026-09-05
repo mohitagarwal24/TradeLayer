@@ -62,6 +62,9 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
 
     event RequestCreated(string orderId, string encryptedOrder);
     event OracleAggregatorSet(address oracle);
+    event OrderSettled(
+        string indexed orderId, address indexed user, bool isRedeem, string stockName, uint256 stockQuantity, uint256 usdcAmount
+    );
 
     constructor(address _usdc,  address _pyth) {
         require(_usdc != address(0), "Invalid USDC address");
@@ -230,6 +233,16 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
         } else {
             _processPurchase(orderId, result);
         }
+
+        Result memory settled = abi.decode(result, (Result));
+        emit OrderSettled(
+            orderId,
+            req.requester,
+            req.isRedeem,
+            settled.stockName,
+            req.isRedeem ? req.tokenBalance : settled.stockQuantity,
+            req.isRedeem ? settled.amountToRefund : (req.usdcBalance - settled.amountToRefund)
+        );
     }
 
     /* ---------- INTERNAL LOGIC ---------- */
@@ -295,6 +308,12 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
 
 
     /* ---------- HELPERS ---------- */
+
+    /// @notice Full stock list for a user. The auto-generated getter for the
+    /// public mapping only exposes element-by-element access.
+    function getStockHoldings(address user) external view returns (string[] memory) {
+        return stockHoldings[user];
+    }
 
     function _ownsStock(address user, string memory stockName) internal view returns (bool) {
         string[] memory list = stockHoldings[user];

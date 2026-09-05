@@ -27,11 +27,14 @@ scroll = "https://rpc.scroll.io"
 pgn = "https://rpc.publicgoods.network"
 pgnTestnet = "https://sepolia.publicgoods.network"
 
+# Hedera
+hederaTestnet = "https://testnet.hashio.io/api"
+hederaMainnet = "https://mainnet.hashio.io/api"
 
 localhost = "http://127.0.0.1:8545"
 
 [etherscan]
-polygonMumbai = { key = "${ETHERSCAN_API_KEY}" }
+hederaTestnet = { url = "https://sourcify.dev/server", key = "no-key-needed" }
 sepolia = { key = "${ETHERSCAN_API_KEY}" }
 
 [fuzz]
