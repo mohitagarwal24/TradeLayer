@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     MockUSDC: {
-      address: "0x8a791620dd6260079bf849dc5567adc3f2fdc318",
+      address: "0x68b1d87f95878fe05b998f19b66f4baba5de1aed",
       abi: [
         {
           type: "constructor",
@@ -342,10 +342,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 7,
+      deployedOnBlock: 13,
     },
     MockPyth: {
-      address: "0x610178da211fef7d417bc0e6fed39f05609ad788",
+      address: "0x3aa5ebb10dc797cac828524e59a333d0a371443c",
       abi: [
         {
           type: "function",
@@ -516,10 +516,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 8,
+      deployedOnBlock: 14,
     },
     TradeLayer: {
-      address: "0xb7f8bc63bbcad18155201308c8f3540b07f84f5e",
+      address: "0xc6e7df5e7b4f2a278906862b61205850344d4e7d",
       abi: [
         {
           type: "constructor",
@@ -1343,7 +1343,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 9,
+      deployedOnBlock: 15,
     },
   },
 } as const;

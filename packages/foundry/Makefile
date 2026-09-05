@@ -59,3 +59,9 @@ test:
 verify:
 	forge script script/VerifyAll.s.sol --ffi --rpc-url $(RPC_URL)
 
+# Deploy to Hedera testnet (requires PRIVATE_KEY in packages/foundry/.env)
+deploy-hedera-testnet:
+	@if [ -z "$(PRIVATE_KEY)" ] && ! rg -q "^PRIVATE_KEY=0x" .env 2>/dev/null; then 		echo "Error: set PRIVATE_KEY in packages/foundry/.env first (yarn generate)"; 		exit 1; 	fi
+	forge script script/Deploy.s.sol --rpc-url hederaTestnet --broadcast --ffi --slow
+	node scripts-js/generateTsAbis.js
+
