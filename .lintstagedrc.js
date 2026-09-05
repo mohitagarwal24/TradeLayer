@@ -1,21 +1,22 @@
-const path = require("path");
+const buildFrontendEslintCommand = (filenames) =>
+  // ESLint 9 flat config takes files as positional args; yarn runs the
+  // script inside packages/nextjs, so strip that prefix from staged paths.
+  `yarn workspace @tradelayer/frontend lint --fix ${filenames
+    .map((f) => f.replace(/^packages\/nextjs\//, ""))
+    .join(" ")}`;
 
-const buildNextEslintCommand = (filenames) =>
-  `yarn next:lint --fix --file ${filenames
-    .map((f) => path.relative(path.join("packages", "nextjs"), f))
-    .join(" --file ")}`;
-
-const checkTypesNextCommand = () => "yarn next:check-types";
+const checkTypesFrontendCommand = () =>
+  "yarn workspace @tradelayer/frontend check-types";
 
 const buildHardhatEslintCommand = (filenames) =>
-  `yarn hardhat:lint-staged --fix ${filenames
-    .map((f) => path.relative(path.join("packages", "hardhat"), f))
+  `yarn foundry:lint --fix ${filenames
+    .map((f) => f.replace(/^packages\/foundry\//, ""))
     .join(" ")}`;
 
 module.exports = {
   "packages/nextjs/**/*.{ts,tsx}": [
-    buildNextEslintCommand,
-    checkTypesNextCommand,
+    buildFrontendEslintCommand,
+    checkTypesFrontendCommand,
   ],
-  "packages/hardhat/**/*.{ts,tsx}": [buildHardhatEslintCommand],
+  "packages/foundry/**/*.{ts,tsx}": [buildHardhatEslintCommand],
 };

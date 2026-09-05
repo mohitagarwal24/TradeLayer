@@ -23,4 +23,18 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
+  {
+    // SE-2 plumbing sits on viem/wagmi generic boundaries where precise
+    // typing isn't expressible; upstream scaffold-eth relaxes these too.
+    files: [
+      "hooks/scaffold-eth/**",
+      "utils/scaffold-eth/**",
+      "services/**",
+      "contracts/deployedContracts.ts",
+      "scaffold.config.ts",
+    ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
 );

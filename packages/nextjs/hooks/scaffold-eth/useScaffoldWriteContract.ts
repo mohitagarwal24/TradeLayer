@@ -113,7 +113,7 @@ export function useScaffoldWriteContract<TContractName extends ContractName>(
         abi: deployedContractData.abi as Abi,
         address: deployedContractData.address,
         ...variables,
-      } as WriteContractVariables<Abi, string, any[], Config, number>;
+      } as any;
 
       if (!finalConfig?.disableSimulate) {
         await simulateContractWriteAndNotifyError({
@@ -138,8 +138,6 @@ export function useScaffoldWriteContract<TContractName extends ContractName>(
       const writeTxResult = await writeTx(makeWriteWithParams, { blockConfirmations, onBlockConfirmation });
 
       return writeTxResult;
-    } catch (e: any) {
-      throw e;
     } finally {
       setIsMining(false);
     }
@@ -171,7 +169,7 @@ export function useScaffoldWriteContract<TContractName extends ContractName>(
         abi: deployedContractData.abi as Abi,
         address: deployedContractData.address,
         ...variables,
-      } as WriteContractVariables<Abi, string, any[], Config, number>,
+      } as any,
       options as
         | MutateOptions<
             WriteContractReturnType,

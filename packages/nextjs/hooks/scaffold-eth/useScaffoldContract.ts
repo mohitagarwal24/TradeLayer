@@ -36,26 +36,16 @@ export const useScaffoldContract = <
 
   let contract = undefined;
   if (deployedContractData && publicClient) {
-    contract = getContract<
-      Transport,
-      Address,
-      Contract<TContractName>["abi"],
-      TWalletClient extends Exclude<GetWalletClientReturnType, null>
-        ? {
-            public: Client<Transport, Chain>;
-            wallet: TWalletClient;
-          }
-        : { public: Client<Transport, Chain> },
-      Chain,
-      Account
-    >({
+    // Explicit viem generics don't survive wagmi v3's client types; the
+    // runtime shape is unchanged, so build loosely and expose the typed ABI.
+    contract = getContract({
       address: deployedContractData.address,
       abi: deployedContractData.abi as Contract<TContractName>["abi"],
       client: {
         public: publicClient,
         wallet: walletClient ? walletClient : undefined,
       } as any,
-    });
+    }) as any;
   }
 
   return {

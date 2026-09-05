@@ -23,8 +23,9 @@
 
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "~~/*": ["./*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "hooks", "utils", "services", "contracts", "scaffold.config.ts"]
 }
