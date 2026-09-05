@@ -16,20 +16,23 @@ contract TradeLayerInvariantTest is Test {
         usdc = new MockUSDC(); // this contract gets minted 10 million mock usdc
         tradeLayer = new TradeLayer(address(usdc), address(2));
         handler = new Handler(tradeLayer, usdc);
-        
+
+        // The handler acts as the backend that settles requests.
+        tradeLayer.setBackendWallet(address(handler));
+
         // Give handler contract USDC for fulfilling redemptions
         usdc.mint(address(tradeLayer), 10_000_000e6);
-        
+
         // Set handler as target for fuzzing
         targetContract(address(handler));
-        
+
         // Only call these functions
         bytes4[] memory selectors = new bytes4[](4);
         selectors[0] = Handler.buyStock.selector;
         selectors[1] = Handler.fulfillBuyRequest.selector;
         selectors[2] = Handler.redeemStock.selector;
         selectors[3] = Handler.fulfillRedeemRequest.selector;
-        
+
         targetSelector(FuzzSelector({
             addr: address(handler),
             selectors: selectors
@@ -64,17 +67,26 @@ contract TradeLayerInvariantTest is Test {
         );
     }
     
-    /* ---------- INVARIANT 3: NO DUPLICATE ORDER PROCESSING ---------- */
-    
-    /// @notice Orders should never be processed twice
-    function invariant_noDuplicateOrderProcessing() public view {
-        // This is implicitly tested by the orderProcessed mapping
-        // If an order is processed twice, the second call will revert
-        // The handler won't count failed calls, so we can check:
-        
-        // All fulfilled orders should be marked as processed
-        // This is enforced by the contract, so we just verify the mapping works
-        assertTrue(true, "Order processing works correctly");
+    /* ---------- INVARIANT 3: SETTLEMENT IS BOUND TO INTENT ---------- */
+
+    /// @notice The contract's recorded per-user, per-stock holdings must equal the
+    /// intended holdings the handler tracked from the stock/quantity each request
+    /// actually committed to. If a settlement could be attributed to the wrong
+    /// stock, user, or quantity, this diverges. (The original invariant #3 was a
+    /// no-op `assertTrue(true)` and could not catch this class of bug at all.)
+    function invariant_settlementMatchesIntent() public view {
+        address[] memory actors = handler.getActors();
+        string[] memory stocks = handler.getStocks();
+
+        for (uint256 i = 0; i < actors.length; i++) {
+            for (uint256 j = 0; j < stocks.length; j++) {
+                assertEq(
+                    tradeLayer.totalHoldings(actors[i], stocks[j]),
+                    handler.ghost_holdings(actors[i], stocks[j]),
+                    "INVARIANT VIOLATED: on-chain holdings != intended holdings"
+                );
+            }
+        }
     }
     
     /* ---------- INVARIANT 4: USER BALANCE >= USER HOLDINGS ---------- */
@@ -130,38 +142,58 @@ contract TradeLayerInvariantTest is Test {
     }
     
     /* ---------- INVARIANT 6: ACCOUNTING CONSISTENCY ---------- */
-    
+
     /// @notice Ghost variable tracking should match actual state
     function invariant_ghostVariableConsistency() public view {
         // Total minted should equal total supply - total burned
         uint256 netSupply = handler.ghost_totalTokensMinted() - handler.ghost_totalTokensBurned();
-        
+
         assertEq(
             netSupply,
             tradeLayer.totalSupply(),
             "INVARIANT VIOLATED: Ghost tracking inconsistent with actual supply"
         );
     }
-    
-    
-    /* ---------- HELPERS ---------- */
-    
-    function _getActors() internal view returns (address[] memory) {
-        address[] memory actors = new address[](5);
-        for (uint i = 0; i < 5; i++) {
-            actors[i] = address(uint160(0x10000 + i));
-        }
-        return actors;
+
+    /* ---------- INVARIANT 7: NO DUPLICATE ORDER PROCESSING ---------- */
+
+    /// @notice Each successful settlement marks exactly one new order processed, so
+    /// the number of settlements the handler performed must equal the number of
+    /// orderIds the contract has flagged as processed. Processing an order twice
+    /// would increment the former without the latter.
+    function invariant_noDuplicateOrderProcessing() public view {
+        assertEq(
+            handler.ghost_ordersProcessed(),
+            handler.countProcessedOrders(),
+            "INVARIANT VIOLATED: settlement count != processed order count"
+        );
     }
-    
-    function _getStocks() internal pure returns (string[] memory) {
-        string[] memory stocks = new string[](5);
-        stocks[0] = "AAPL";
-        stocks[1] = "GOOGL";
-        stocks[2] = "TSLA";
-        stocks[3] = "MSFT";
-        stocks[4] = "AMZN";
-        return stocks;
+
+    /* ---------- INVARIANT 8: BUY ESCROW IS SEGREGATED ---------- */
+
+    /// @notice The contract's own accounting of USDC reserved against unsettled buy
+    /// requests must equal the sum of those requests. Combined with invariant #1
+    /// this is what makes escrow solvency structural rather than incidental: a
+    /// redemption payout can only draw on the balance above `escrowedBuyUsdc`, so it
+    /// cannot be funded out of another user's unfilled purchase.
+    function invariant_buyEscrowSegregated() public view {
+        assertEq(
+            tradeLayer.escrowedBuyUsdc(),
+            handler.getTotalPendingUsdc(),
+            "INVARIANT VIOLATED: escrowedBuyUsdc != sum of pending buy orders"
+        );
+    }
+
+
+    /* ---------- HELPERS ---------- */
+
+    // Delegate to the handler so the actor/stock sets cannot drift apart.
+    function _getActors() internal view returns (address[] memory) {
+        return handler.getActors();
+    }
+
+    function _getStocks() internal view returns (string[] memory) {
+        return handler.getStocks();
     }
     
     /* ---------- AFTER INVARIANT ---------- */

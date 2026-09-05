@@ -15,17 +15,31 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
 
     IERC20 public immutable usdc;
     IPyth public immutable pyth;
-    address public backendWallet; // For security
+    address public owner;
+    address public backendWallet; // may call fulfillRequest
 
     mapping(address => mapping(string => uint256)) public totalHoldings;
     mapping(address => string[]) public stockHoldings;
-    mapping(string => bool) public orderProcessed; // For Invariant #3
-    mapping(string => bool orderIdUsed) public orderIdUsed;
+    mapping(string => bool) public orderProcessed; // settled exactly once
+    mapping(string => bool) public orderIdUsed;
     mapping(string => bytes32) public stockPriceIds;
 
-    // no use
+    /// @notice DSTOCK committed to an in-flight redeem request, so the same
+    /// balance cannot back two redemptions at once.
+    mapping(address => uint256) public lockedForRedeem;
+
+    /// @notice USDC escrowed against buy requests that have not settled yet.
+    /// Redemption payouts may only draw on the balance above this figure, so a
+    /// redeem can never be funded out of another user's unfilled purchase.
+    uint256 public escrowedBuyUsdc;
+
     modifier onlyBackend() {
         require(msg.sender == backendWallet, "Not backend");
+        _;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
         _;
     }
 
@@ -54,6 +68,8 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
         require(_pyth != address(0), "Invalid Pyth address");
         usdc = IERC20(_usdc);
         pyth = IPyth(_pyth);
+        owner = msg.sender;
+        backendWallet = msg.sender;
         stockPriceIds["AAPL"] = 0x49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175084a5ad55688;
         stockPriceIds["GOOGL"] = 0x5a48c03e9b9cb337801073ed9d166817473697efff0d138874e0f6a33d6d5aa6; 
         stockPriceIds["TSLA"] = 0x16dad506d7db8da01c87581c87ca897a012a153557d4d578c3b9c9e1bc0632f1; 
@@ -111,9 +127,15 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
     }
 
     /// @notice Add support for a new stock
-    function addStock(string memory symbol, bytes32 priceId) external onlyBackend {
+    function addStock(string memory symbol, bytes32 priceId) external onlyOwner {
         require(priceId != bytes32(0), "Invalid price ID");
         stockPriceIds[symbol] = priceId;
+    }
+
+    /// @notice Rotate the wallet allowed to settle requests
+    function setBackendWallet(address _backendWallet) external onlyOwner {
+        require(_backendWallet != address(0), "Invalid backend");
+        backendWallet = _backendWallet;
     }
 
     /// @notice Check if a stock is supported
@@ -149,7 +171,10 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
         require(!orderIdUsed[orderId], TradeLayer__OrderIdUsed(orderId));
         require(amountOfUsdc > 0, "amount cannot be zero");
 
+        orderIdUsed[orderId] = true;
+
         usdc.safeTransferFrom(msg.sender, address(this), amountOfUsdc);
+        escrowedBuyUsdc += amountOfUsdc;
 
         requests[orderId] = Request({
             requester: msg.sender,
@@ -168,10 +193,18 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
     ) external {
         require(!orderIdUsed[orderId], TradeLayer__OrderIdUsed(orderId));
         require(amount > 0, "amount cannot be zero");
-        require(balanceOf(msg.sender) >= amount, "not enough DSTOCK");
 
-        // burn immediately so user cannot use twice
-        // _burn(msg.sender, amount);
+        // Lock rather than burn: the encrypted order does not reveal which stock
+        // is being sold, so totalHoldings cannot be decremented until settlement.
+        // Locking keeps totalSupply == sum(totalHoldings) intact while still
+        // preventing the same balance from backing two redeem requests.
+        require(
+            balanceOf(msg.sender) - lockedForRedeem[msg.sender] >= amount,
+            "not enough unlocked DSTOCK"
+        );
+
+        orderIdUsed[orderId] = true;
+        lockedForRedeem[msg.sender] += amount;
 
         requests[orderId] = Request({
             requester: msg.sender,
@@ -185,28 +218,40 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
 
     /* ---------- BACKEND ORACLE CALL ---------- */
 
-    function fulfillRequest(string memory orderId, bytes memory result) external {
+    function fulfillRequest(string memory orderId, bytes memory result) external onlyBackend {
         Request memory req = requests[orderId];
         require(req.requester != address(0), "invalid order");
 
-        require(!orderProcessed[orderId], "Order already processed"); // prevent incorrect accounting 
+        require(!orderProcessed[orderId], "Order already processed"); // prevent incorrect accounting
         orderProcessed[orderId] = true;
 
         if (req.isRedeem) {
-            _processRedemption(result);
+            _processRedemption(orderId, result);
         } else {
-            _processPurchase(result);
+            _processPurchase(orderId, result);
         }
     }
 
     /* ---------- INTERNAL LOGIC ---------- */
 
-    function _processPurchase(bytes memory result) internal {
+    function _processPurchase(string memory orderId, bytes memory result) internal {
         Result memory res = abi.decode(result, (Result));
 
         uint256 qty = res.stockQuantity;
-        Request memory req = requests[res.orderId];
+        // Read the request by the caller-supplied orderId, not res.orderId, so a
+        // settlement cannot be attributed to a different user's order.
+        Request memory req = requests[orderId];
         address user = req.requester;
+
+        // A partial fill leaves unspent USDC that belongs to the user. The refund
+        // can never exceed what this order actually escrowed.
+        uint256 escrowed = req.usdcBalance;
+        uint256 refund = res.amountToRefund;
+        require(refund <= escrowed, "refund exceeds escrow");
+
+        // The order is settled, so its escrow is no longer reserved: the refund
+        // goes back to the user and the remainder becomes free protocol balance.
+        escrowedBuyUsdc -= escrowed;
 
         // Track stock positions
         if (!_ownsStock(user, res.stockName)) {
@@ -217,21 +262,34 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
 
         // Mint non-transferable DSTOCK item tokens
         _mint(user, qty);
+
+        if (refund > 0) {
+            usdc.safeTransfer(user, refund);
+        }
     }
 
-    function _processRedemption(bytes memory result) internal {
+    function _processRedemption(string memory orderId, bytes memory result) internal {
         Result memory res = abi.decode(result, (Result));
 
-        uint256 qty = res.stockQuantity;
-        Request memory req = requests[res.orderId];
+        Request memory req = requests[orderId];
         address user = req.requester;
 
+        // The settled quantity must match what the user committed at request time.
+        uint256 qty = req.tokenBalance;
+        require(res.stockQuantity == qty, "quantity mismatch");
         require(totalHoldings[user][res.stockName] >= qty, "insufficient holdings");
 
-        totalHoldings[user][res.stockName] -= qty;
+        // Only the balance not reserved against pending buys may be paid out.
+        uint256 balance = usdc.balanceOf(address(this));
+        uint256 reserved = escrowedBuyUsdc;
+        uint256 free = balance > reserved ? balance - reserved : 0;
+        require(res.amountToRefund <= free, "insufficient free USDC");
 
-        // Send locked USDC back
-        usdc.safeTransfer(user, res.amountToRefund); // amountToRefund will be returned by the backend, how much money came from selling the stock
+        totalHoldings[user][res.stockName] -= qty;
+        lockedForRedeem[user] -= qty;
+
+        // Send the sale proceeds reported by the backend.
+        usdc.safeTransfer(user, res.amountToRefund);
         _burn(user, qty);
     }
 

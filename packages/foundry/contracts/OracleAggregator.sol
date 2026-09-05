@@ -35,6 +35,13 @@ contract OracleAggregator {
     }
     
     mapping(string => TWAPData) public twapData;
+
+    address public owner;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
     
     // Configuration
     uint256 public constant MAX_PRICE_AGE = 1 hours;
@@ -51,16 +58,17 @@ contract OracleAggregator {
     constructor(address _pyth) {
         require(_pyth != address(0), "Invalid Pyth address");
         pyth = IPyth(_pyth);
+        owner = msg.sender;
     }
-    
+
     /// @notice Set Chainlink feed for a stock
-    function setChainlinkFeed(string memory symbol, address feed) external {
+    function setChainlinkFeed(string memory symbol, address feed) external onlyOwner {
         require(feed != address(0), "Invalid feed");
         chainlinkFeeds[symbol] = IChainlinkAggregator(feed); // FIXED: Use mapping
     }
-    
+
     /// @notice Set Pyth price ID for a stock
-    function setPythPriceId(string memory symbol, bytes32 priceId) external {
+    function setPythPriceId(string memory symbol, bytes32 priceId) external onlyOwner {
         require(priceId != bytes32(0), "Invalid price ID");
         pythPriceIds[symbol] = priceId;
     }
