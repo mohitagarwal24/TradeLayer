@@ -1,0 +1,56 @@
+import Alpaca from "@alpacahq/alpaca-trade-api";
+import { handleTradeSettlement } from "./contractCalls";
+import { orderDB } from "./orderStore";
+import { ethers } from "ethers";
+
+const alpaca = new Alpaca({
+  keyId: "REDACTED_ALPACA_KEY_ID",
+  secretKey: "REDACTED_ALPACA_SECRET",
+  paper: true // set false for live trading
+});
+
+export async function listenToOrderEvents() {
+    const ws = alpaca.trade_ws;
+  
+    ws.onConnect(() => {
+      console.log("Connected to Alpaca order streams.");
+      ws.subscribe(["trade_updates"]);
+    });
+  
+    ws.onStateChange((state) => {
+      console.log("Websocket state changed:", state);
+    });
+  
+    ws.onOrderUpdate(async (event) => {
+      
+        console.log("event", event);
+
+        const {event:status, order} = event;
+
+        const orderId = order.client_order_id;
+        console.log("got order", orderId)
+
+        if (!orderDB.includes(orderId)){
+            console.log('order is not there')
+            return;
+        };
+
+        if (status === "fill") {
+            console.log(`Order Filled! Executing settlement logic`);
+
+            const amountToRefund = (order.filled_qty * order.filled_avg_price).toString();
+            console.log("amount to refund:",amountToRefund)
+            const scaledValue = ethers.parseUnits(amountToRefund,6);
+      
+            // Your settlement or blockchain interaction here:
+            const tx = await handleTradeSettlement(orderId,order.symbol,order.filled_qty,order.side, scaledValue);
+
+            console.log("fulfilled request",tx);
+          }
+          else {
+            console.log("order is pending for order with orderId:",orderId)
+          }
+    });
+  
+    ws.connect();
+  }
