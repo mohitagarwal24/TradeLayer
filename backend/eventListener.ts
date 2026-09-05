@@ -1,10 +1,4 @@
-import Alpaca from "@alpacahq/alpaca-trade-api";
-
-const alpaca = new Alpaca({
-  keyId: "REDACTED_ALPACA_KEY_ID",
-  secretKey: "REDACTED_ALPACA_SECRET",
-  paper: true // set false for live trading
-});
+import { alpaca } from "./components/alpacaClient";
 
 // Connect to WebSocket
 const socket = alpaca.trade_ws;

@@ -1,12 +1,6 @@
-import Alpaca from "@alpacahq/alpaca-trade-api";
 import { v4 as uuidv4 } from "uuid";
 import { orderDB } from "./orderStore";
-
-const alpaca = new Alpaca({
-  keyId: "REDACTED_ALPACA_KEY_ID",
-  secretKey: "REDACTED_ALPACA_SECRET",
-  paper: true // set false for live trading
-});
+import { alpaca } from "./alpacaClient";
 
 export async function createOrder(orderId,symbol, qty, side, ordertype) {
 

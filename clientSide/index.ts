@@ -4,7 +4,7 @@ import express from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import dotenv from "dotenv";
 import { buyOrder, sellOrder } from "./contractCalls";
-import Alpaca from "@alpacahq/alpaca-trade-api";
+import { alpaca } from "./alpacaClient";
 import { readUserHoldings } from "./readContract";
 import { wallet } from "./contract";
 
@@ -64,13 +64,7 @@ server.addTool({
       orderId: z.string().describe("OrderId used while creating the Alpaca order")
     }),
     execute: async (args) => {
-  
-      const alpaca = new Alpaca({
-        keyId: "REDACTED_ALPACA_KEY_ID",
-        secretKey: "REDACTED_ALPACA_SECRET",
-        paper: true
-      });
-  
+
       try {
         const order = await alpaca.getOrderByClientId(args.orderId);
         return JSON.stringify({

@@ -27,3 +27,6 @@ nextjs/.env
 
 backend/.env
 clientSide/.env
+
+# local agent tool permissions
+.claude/

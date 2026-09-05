@@ -1,13 +1,7 @@
-import Alpaca from "@alpacahq/alpaca-trade-api";
 import { handleTradeSettlement } from "./contractCalls";
 import { orderDB } from "./orderStore";
 import { ethers } from "ethers";
-
-const alpaca = new Alpaca({
-  keyId: "REDACTED_ALPACA_KEY_ID",
-  secretKey: "REDACTED_ALPACA_SECRET",
-  paper: true // set false for live trading
-});
+import { alpaca } from "./alpacaClient";
 
 export async function listenToOrderEvents() {
     const ws = alpaca.trade_ws;
