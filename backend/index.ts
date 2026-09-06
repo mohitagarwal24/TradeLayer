@@ -1,18 +1,22 @@
 import express from "express";
 import { Events } from "./components/contractListener";
-import {listenToOrderEvents} from "./components/alpacaListener";
+import { listenToOrderEvents } from "./components/alpacaListener";
+import { publicKeyHandler, ephemeralKeyHandler } from "./components/keyExchange";
 
 const app = express();
 const PORT = 8000;
 
 app.use(express.json());
 
-async function startServer() {
+// Order-privacy key exchange
+app.get("/public-key", publicKeyHandler);
+app.post("/ephemeral-key", ephemeralKeyHandler);
 
+async function startServer() {
   // Start server
   app.listen(PORT, async () => {
     console.log(`✅ Server running at http://localhost:${PORT}`);
-    Events(); 
+    Events();
     await listenToOrderEvents();
   });
 }

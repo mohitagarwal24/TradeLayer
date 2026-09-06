@@ -1,572 +1,368 @@
+// AUTO-GENERATED from packages/foundry/out/TradeLayer.sol — do not edit by hand.
 export const abi = [
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_usdc",
-				"type": "address"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "constructor"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "spender",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "allowance",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "needed",
-				"type": "uint256"
-			}
-		],
-		"name": "ERC20InsufficientAllowance",
-		"type": "error"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "sender",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "balance",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "needed",
-				"type": "uint256"
-			}
-		],
-		"name": "ERC20InsufficientBalance",
-		"type": "error"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "approver",
-				"type": "address"
-			}
-		],
-		"name": "ERC20InvalidApprover",
-		"type": "error"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "receiver",
-				"type": "address"
-			}
-		],
-		"name": "ERC20InvalidReceiver",
-		"type": "error"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "sender",
-				"type": "address"
-			}
-		],
-		"name": "ERC20InvalidSender",
-		"type": "error"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "spender",
-				"type": "address"
-			}
-		],
-		"name": "ERC20InvalidSpender",
-		"type": "error"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "token",
-				"type": "address"
-			}
-		],
-		"name": "SafeERC20FailedOperation",
-		"type": "error"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "string",
-				"name": "id",
-				"type": "string"
-			}
-		],
-		"name": "TradeLayer__OrderIdUsed",
-		"type": "error"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "owner",
-				"type": "address"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "spender",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "value",
-				"type": "uint256"
-			}
-		],
-		"name": "Approval",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "string",
-				"name": "orderId",
-				"type": "string"
-			},
-			{
-				"indexed": false,
-				"internalType": "string",
-				"name": "encryptedOrder",
-				"type": "string"
-			}
-		],
-		"name": "RequestCreated",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "from",
-				"type": "address"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "value",
-				"type": "uint256"
-			}
-		],
-		"name": "Transfer",
-		"type": "event"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "owner",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "spender",
-				"type": "address"
-			}
-		],
-		"name": "allowance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "spender",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "value",
-				"type": "uint256"
-			}
-		],
-		"name": "approve",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "backendWallet",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "account",
-				"type": "address"
-			}
-		],
-		"name": "balanceOf",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "string",
-				"name": "orderId",
-				"type": "string"
-			},
-			{
-				"internalType": "string",
-				"name": "encryptedOrder",
-				"type": "string"
-			},
-			{
-				"internalType": "uint256",
-				"name": "amountOfUsdc",
-				"type": "uint256"
-			}
-		],
-		"name": "buyStock",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "decimals",
-		"outputs": [
-			{
-				"internalType": "uint8",
-				"name": "",
-				"type": "uint8"
-			}
-		],
-		"stateMutability": "pure",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "string",
-				"name": "orderId",
-				"type": "string"
-			},
-			{
-				"internalType": "bytes",
-				"name": "result",
-				"type": "bytes"
-			}
-		],
-		"name": "fulfillRequest",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "name",
-		"outputs": [
-			{
-				"internalType": "string",
-				"name": "",
-				"type": "string"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "string",
-				"name": "",
-				"type": "string"
-			}
-		],
-		"name": "orderIdUsed",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "orderIdUsed",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "string",
-				"name": "",
-				"type": "string"
-			}
-		],
-		"name": "orderProcessed",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "string",
-				"name": "orderId",
-				"type": "string"
-			},
-			{
-				"internalType": "string",
-				"name": "encryptedOrder",
-				"type": "string"
-			},
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "redeemStock",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "string",
-				"name": "",
-				"type": "string"
-			}
-		],
-		"name": "requests",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "requester",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "usdcBalance",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "tokenBalance",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "isRedeem",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "stockHoldings",
-		"outputs": [
-			{
-				"internalType": "string",
-				"name": "",
-				"type": "string"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "symbol",
-		"outputs": [
-			{
-				"internalType": "string",
-				"name": "",
-				"type": "string"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			},
-			{
-				"internalType": "string",
-				"name": "",
-				"type": "string"
-			}
-		],
-		"name": "totalHoldings",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "totalSupply",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "transfer",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "from",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "transferFrom",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "usdc",
-		"outputs": [
-			{
-				"internalType": "contract IERC20",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	}
-]
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_usdc",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_pyth",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "backendWallet",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "balanceOf",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "buyStock",
+    "inputs": [
+      {
+        "name": "orderId",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "encryptedOrder",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "amountOfUsdc",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "decimals",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "escrowedBuyUsdc",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "fulfillRequest",
+    "inputs": [
+      {
+        "name": "orderId",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "result",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "lockedForRedeem",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "orderIdUsed",
+    "inputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "orderProcessed",
+    "inputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "owner",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "redeemStock",
+    "inputs": [
+      {
+        "name": "orderId",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "encryptedOrder",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "requests",
+    "inputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "requester",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "usdcBalance",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "tokenBalance",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "isRedeem",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "stockHoldings",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "symbol",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "totalHoldings",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "OrderSettled",
+    "inputs": [
+      {
+        "name": "orderId",
+        "type": "string",
+        "indexed": true,
+        "internalType": "string"
+      },
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "isRedeem",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      },
+      {
+        "name": "stockName",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      },
+      {
+        "name": "stockQuantity",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "usdcAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RequestCreated",
+    "inputs": [
+      {
+        "name": "orderId",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      },
+      {
+        "name": "encryptedOrder",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      }
+    ],
+    "anonymous": false
+  }
+];
