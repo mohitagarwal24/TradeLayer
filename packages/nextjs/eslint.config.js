@@ -35,6 +35,15 @@ export default tseslint.config(
     ],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
+      "react-refresh/only-export-components": "off",
+    },
+  },
+  {
+    // shadcn/ui components commonly co-export variants/helpers with the
+    // component; that trips react-refresh without changing runtime behaviour.
+    files: ["src/components/ui/**"],
+    rules: {
+      "react-refresh/only-export-components": "off",
     },
   },
 );
