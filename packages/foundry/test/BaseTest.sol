@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
+
 import {TradeLayer} from "../contracts/TradeLayer.sol";
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";

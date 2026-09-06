@@ -61,7 +61,6 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
     mapping(string => Request) public requests;
 
     event RequestCreated(string orderId, string encryptedOrder);
-    event OracleAggregatorSet(address oracle);
     event OrderSettled(
         string indexed orderId, address indexed user, bool isRedeem, string stockName, uint256 stockQuantity, uint256 usdcAmount
     );
