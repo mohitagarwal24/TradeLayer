@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     MockUSDC: {
-      address: "0x68b1d87f95878fe05b998f19b66f4baba5de1aed",
+      address: "0x8a791620dd6260079bf849dc5567adc3f2fdc318",
       abi: [
         {
           type: "constructor",
@@ -342,10 +342,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 13,
+      deployedOnBlock: 5,
     },
     MockPyth: {
-      address: "0x3aa5ebb10dc797cac828524e59a333d0a371443c",
+      address: "0x610178da211fef7d417bc0e6fed39f05609ad788",
       abi: [
         {
           type: "function",
@@ -516,10 +516,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 14,
+      deployedOnBlock: 6,
     },
     TradeLayer: {
-      address: "0xc6e7df5e7b4f2a278906862b61205850344d4e7d",
+      address: "0xb7f8bc63bbcad18155201308c8f3540b07f84f5e",
       abi: [
         {
           type: "constructor",
@@ -1135,19 +1135,6 @@ const deployedContracts = {
         },
         {
           type: "event",
-          name: "OracleAggregatorSet",
-          inputs: [
-            {
-              name: "oracle",
-              type: "address",
-              indexed: false,
-              internalType: "address",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
           name: "OrderSettled",
           inputs: [
             {
@@ -1343,7 +1330,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 15,
+      deployedOnBlock: 6,
     },
   },
 } as const;

@@ -14,6 +14,7 @@ import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth/useScaffoldWrite
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 import { fmtShares, fmtUsdc, parseUsdc } from "@/lib/format";
+import { sealOrder } from "@/lib/sealOrder";
 
 const STOCKS = ["AAPL", "GOOGL", "TSLA", "MSFT"] as const;
 type StockSymbol = (typeof STOCKS)[number];
@@ -27,6 +28,8 @@ export const PYTH_IDS: Record<StockSymbol, `0x${string}`> = {
 };
 
 const HERMES_URL = "https://hermes.pyth.network";
+// Backend key-exchange API (order privacy). Set in .env for production.
+const BACKEND_API = import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000";
 
 type LivePrice = { price: number };
 
@@ -94,6 +97,8 @@ export function TradingPanel() {
     args: [symbol],
   });
 
+  // Real USDC on Hedera testnet comes via externalContracts under the same
+  // display name; on local chains it resolves to the deployed MockUSDC.
   const { data: usdcBalance } = useScaffoldReadContract({
     contractName: "MockUSDC",
     functionName: "balanceOf",
@@ -144,19 +149,50 @@ export function TradingPanel() {
     }
   }
 
+  /** Seal intent E2E and register the ephemeral pubkey with the backend. */
+  async function buildEncryptedOrder(orderId: string, side: "buy" | "sell"): Promise<`0x${string}` | null> {
+    try {
+      const pubRes = await fetch(`${BACKEND_API}/public-key`);
+      if (!pubRes.ok) throw new Error(`backend /public-key ${pubRes.status}`);
+      const { publicKey } = (await pubRes.json()) as { publicKey: string };
+
+      const qty = side === "sell" ? Number(shareAmount || "0") : Math.round(Number(usdcAmount || "0"));
+      const sealed = await sealOrder(
+        { stock: symbol, qty, side, orderType: "market" },
+        publicKey,
+      );
+
+      await fetch(`${BACKEND_API}/ephemeral-key`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, publicKey: sealed.ephemeralPublicKeyB64 }),
+      });
+
+      return sealed.encryptedOrder;
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not reach the settlement backend", {
+        description: "Orders are encrypted end-to-end; the backend must be online to place one.",
+      });
+      return null;
+    }
+  }
+
   async function handleBuy() {
     if (!address) return;
     const orderId = crypto.randomUUID();
+    const encryptedOrder = await buildEncryptedOrder(orderId, "buy");
+    if (!encryptedOrder) return;
     try {
       await writeTx(async () =>
         writeTradeLayer({
           functionName: "buyStock",
-          args: [orderId, `order:${orderId}:${symbol}`, amountWei],
+          args: [orderId, encryptedOrder, amountWei],
         }),
       );
       setUsdcAmount("");
       toast.success(`Buy order placed (${orderId.slice(0, 8)})`, {
-        description: "Escrowed on-chain. The backend will settle it shortly.",
+        description: "Escrowed on-chain, encrypted end-to-end. The backend will settle it.",
       });
     } catch {
       /* surfaced by transactor */
@@ -166,15 +202,19 @@ export function TradingPanel() {
   async function handleRedeem() {
     if (!address || !shareAmount) return;
     const orderId = crypto.randomUUID();
+    const encryptedOrder = await buildEncryptedOrder(orderId, "sell");
+    if (!encryptedOrder) return;
     try {
       await writeTx(async () =>
         writeTradeLayer({
           functionName: "redeemStock",
-          args: [orderId, `order:${orderId}:${symbol}`, BigInt(shareAmount)],
+          args: [orderId, encryptedOrder, BigInt(Math.round(Number(shareAmount)))],
         }),
       );
       setShareAmount("");
-      toast.success(`Redeem request placed (${orderId.slice(0, 8)})`);
+      toast.success(`Redeem request placed (${orderId.slice(0, 8)})`, {
+        description: "Locked on-chain, encrypted end-to-end. The backend will settle it.",
+      });
     } catch {
       /* surfaced by transactor */
     }
@@ -183,7 +223,7 @@ export function TradingPanel() {
   // --- derived --------------------------------------------------------------
 
   const onChainPrice = price18 !== undefined ? Number(formatUnits(price18, 18)) : undefined;
-  const displayPrice = isLocalChain ? onChainPrice : (livePrices[symbol]?.price ?? onChainPrice);
+  const displayPrice = livePrices[symbol]?.price ?? onChainPrice;
 
   const estimatedShares =
     mode === "buy" && displayPrice && displayPrice > 0 && Number(usdcAmount) > 0
@@ -323,7 +363,7 @@ export function TradingPanel() {
         ) : (
           <Button
             onClick={handleRedeem}
-            disabled={!shareAmount || BigInt(shareAmount || "0") <= 0n}
+            disabled={!shareAmount || BigInt(Math.round(Number(shareAmount || "0"))) <= 0n}
             className="h-12 w-full rounded-xl text-base font-semibold gap-2"
           >
             <ArrowDownUp className="h-4 w-4" /> Redeem {symbol}
@@ -331,8 +371,9 @@ export function TradingPanel() {
         )}
 
         <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
-          Orders are escrowed on-chain and settled by the backend against the Pyth oracle price.
-          {isLocalChain && " Local mock prices refresh with each deploy."}
+          <ShieldCheck className="mr-1 inline h-3 w-3" />
+          Orders are encrypted end-to-end (ECDH + AES-GCM), escrowed on-chain, and settled by the backend against the
+          Pyth oracle price.
         </p>
       </CardContent>
     </Card>
