@@ -1,39 +1,43 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { Test } from "forge-std/Test.sol";
-import { TradeLayer } from "../../contracts/TradeLayer.sol";
-import { MockUSDC } from "../../contracts/mocks/MockUSDC.sol";
-import { Handler } from "./Handler.t.sol";
+import {Test} from "forge-std/Test.sol";
+import {TradeLayer} from "../../contracts/TradeLayer.sol";
+import {MockUSDC} from "../../contracts/mocks/MockUSDC.sol";
+import {MockAtsSecurityToken} from "../../contracts/mocks/MockAtsSecurityToken.sol";
+import {Handler} from "./Handler.t.sol";
 
 contract TradeLayerInvariantTest is Test {
     TradeLayer public tradeLayer;
     MockUSDC public usdc;
+    MockAtsSecurityToken public dstock;
     Handler public handler;
 
     function setUp() public {
-        // Deploy contracts
-        usdc = new MockUSDC(); // this contract gets minted 10 million mock usdc
-        tradeLayer = new TradeLayer(address(usdc), address(2));
-        handler = new Handler(tradeLayer, usdc);
+        usdc = new MockUSDC();
+        dstock = new MockAtsSecurityToken("TradeLayer Equity", "DSTOCK");
+        tradeLayer = new TradeLayer(address(usdc), address(2), address(dstock));
+        dstock.setAgent(address(tradeLayer));
+        handler = new Handler(tradeLayer, usdc, dstock);
 
-        // The handler acts as the backend that settles requests.
+        // Issuer (this contract) KYC's every fuzz actor so ATS mint succeeds.
+        address[] memory actors = handler.getActors();
+        for (uint256 i = 0; i < actors.length; i++) {
+            dstock.grantKyc(actors[i]);
+        }
+
         tradeLayer.setBackendWallet(address(handler));
-
-        // Give handler contract USDC for fulfilling redemptions
         usdc.mint(address(tradeLayer), 10_000_000e6);
 
-        // Set handler as target for fuzzing
         targetContract(address(handler));
 
-        // Only call these functions
         bytes4[] memory selectors = new bytes4[](4);
         selectors[0] = Handler.buyStock.selector;
         selectors[1] = Handler.fulfillBuyRequest.selector;
         selectors[2] = Handler.redeemStock.selector;
         selectors[3] = Handler.fulfillRedeemRequest.selector;
 
-        targetSelector(FuzzSelector({ addr: address(handler), selectors: selectors }));
+        targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
     }
 
     /* ---------- INVARIANT 1: USDC CONSERVATION ---------- */
@@ -101,29 +105,28 @@ contract TradeLayerInvariantTest is Test {
         }
     }
 
-    /* ---------- INVARIANT 5: TRANSFERS ALWAYS REVERT ---------- */
+    /* ---------- INVARIANT 5: TRANSFERS REQUIRE KYC ---------- */
 
-    /// @notice Transfer and transferFrom should always revert
-    function invariant_transfersDisabled() public {
+    /// @notice Secondary transfers of DSTOCK must fail when the recipient is not KYC'd.
+    function invariant_transfersRequireKyc() public {
         address[] memory actors = _getActors();
 
         for (uint256 i = 0; i < actors.length; i++) {
             uint256 balance = tradeLayer.balanceOf(actors[i]);
+            if (balance == 0 || actors.length < 2) continue;
 
-            if (balance > 0 && actors.length > 1) {
-                address recipient = actors[(i + 1) % actors.length];
+            address recipient = actors[(i + 1) % actors.length];
+            // Temporarily revoke recipient KYC to assert the compliance gate.
+            dstock.revokeKyc(recipient);
 
-                vm.prank(actors[i]);
-                try tradeLayer.transfer(recipient, 1) {
-                    fail("INVARIANT VIOLATED: Transfer should revert");
-                } catch (bytes memory reason) {
-                    assertEq(
-                        string(reason),
-                        string(abi.encodeWithSignature("Error(string)", "Transfers are disabled")),
-                        "Wrong revert reason"
-                    );
-                }
+            vm.prank(actors[i]);
+            try dstock.transfer(recipient, 1) {
+                fail("INVARIANT VIOLATED: transfer to non-KYC recipient should revert");
+            } catch {
+                // expected
             }
+
+            dstock.grantKyc(recipient);
         }
     }
 

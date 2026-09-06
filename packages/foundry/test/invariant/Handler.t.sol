@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { Test } from "forge-std/Test.sol";
-import { TradeLayer } from "../../contracts/TradeLayer.sol";
-import { MockUSDC } from "../../contracts/mocks/MockUSDC.sol";
-import { console } from "forge-std/console.sol";
+import {Test} from "forge-std/Test.sol";
+import {TradeLayer} from "../../contracts/TradeLayer.sol";
+import {MockUSDC} from "../../contracts/mocks/MockUSDC.sol";
+import {MockAtsSecurityToken} from "../../contracts/mocks/MockAtsSecurityToken.sol";
+import {console} from "forge-std/console.sol";
 
 /// @dev Handler for stateful invariant fuzzing.
 ///
@@ -18,6 +19,7 @@ import { console } from "forge-std/console.sol";
 contract Handler is Test {
     TradeLayer public tradeLayer;
     MockUSDC public usdc;
+    MockAtsSecurityToken public dstock;
 
     address[] public actors; // users
     string[] public stockSymbols;
@@ -57,16 +59,17 @@ contract Handler is Test {
         _;
     }
 
-    constructor(TradeLayer _tradeLayer, MockUSDC _usdc) {
+    constructor(TradeLayer _tradeLayer, MockUSDC _usdc, MockAtsSecurityToken _dstock) {
         tradeLayer = _tradeLayer;
         usdc = _usdc;
+        dstock = _dstock;
 
-        // Create actors
+        // Create actors. KYC is granted by the test setUp (token owner).
         for (uint256 i = 0; i < 5; i++) {
             address actor = address(uint160(0x10000 + i));
             actors.push(actor);
 
-            usdc.mint(actor, 1_000_000e6); // 1M USDC each
+            usdc.mint(actor, 1_000_000e6);
             vm.prank(actor);
             usdc.approve(address(tradeLayer), type(uint256).max);
         }
@@ -121,12 +124,8 @@ contract Handler is Test {
         // A partial fill returns unspent USDC; it can never exceed the escrow.
         uint256 refund = bound(refundSeed, 0, usdcBalance);
 
-        TradeLayer.Result memory result = TradeLayer.Result({
-            orderId: orderId,
-            stockName: stockName,
-            stockQuantity: quantity,
-            amountToRefund: refund
-        });
+        TradeLayer.Result memory result =
+            TradeLayer.Result({orderId: orderId, stockName: stockName, stockQuantity: quantity, amountToRefund: refund});
 
         // Handler is the backend wallet (set in the test setUp).
         tradeLayer.fulfillRequest(orderId, abi.encode(result));
