@@ -23,10 +23,8 @@ node_modules
 dist
 
 # env
-nextjs/.env
-
+packages/nextjs/.env
 backend/.env
-clientSide/.env
 
 # local agent tool permissions
 .claude/
