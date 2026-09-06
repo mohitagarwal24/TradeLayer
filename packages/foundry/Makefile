@@ -55,9 +55,13 @@ lint:
 test:
 	forge test
 
-# Verify contracts
+# Verify contracts (Hedera testnet via Sourcify — pass ADDRESS=0x...)
 verify:
-	forge script script/VerifyAll.s.sol --ffi --rpc-url $(RPC_URL)
+	@if [ -z "$(ADDRESS)" ]; then \
+		echo "Usage: make verify ADDRESS=0x... [RPC_URL=hederaTestnet]"; \
+		exit 1; \
+	fi
+	forge verify-contract --chain-id 296 --verifier sourcify $(ADDRESS) TradeLayer
 
 # Deploy to Hedera testnet (requires PRIVATE_KEY in packages/foundry/.env)
 deploy-hedera-testnet:

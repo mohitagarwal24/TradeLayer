@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-import {TradeLayer} from "../../contracts/TradeLayer.sol";
-import {MockUSDC} from "../../contracts/mocks/MockUSDC.sol";
-import {console} from "forge-std/console.sol";
+import { Test } from "forge-std/Test.sol";
+import { TradeLayer } from "../../contracts/TradeLayer.sol";
+import { MockUSDC } from "../../contracts/mocks/MockUSDC.sol";
+import { console } from "forge-std/console.sol";
 
 /// @dev Handler for stateful invariant fuzzing.
 ///
@@ -139,10 +139,7 @@ contract Handler is Test {
         ghost_ordersProcessed++;
     }
 
-    function redeemStock(uint256 actorSeed, uint256 stockSeed, uint256 amountSeed)
-        external
-        countCall("redeemStock")
-    {
+    function redeemStock(uint256 actorSeed, uint256 stockSeed, uint256 amountSeed) external countCall("redeemStock") {
         address actor = actors[bound(actorSeed, 0, actors.length - 1)];
 
         // Unlocked balance the actor can still commit to a redeem.
@@ -171,10 +168,7 @@ contract Handler is Test {
         tradeLayer.redeemStock(orderId, encryptedOrder, amount);
     }
 
-    function fulfillRedeemRequest(uint256 orderSeed, uint256 usdcToReturn)
-        external
-        countCall("fulfillRedeem")
-    {
+    function fulfillRedeemRequest(uint256 orderSeed, uint256 usdcToReturn) external countCall("fulfillRedeem") {
         if (allOrderIds.length == 0) return;
 
         string memory orderId = allOrderIds[bound(orderSeed, 0, allOrderIds.length - 1)];

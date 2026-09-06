@@ -2,9 +2,9 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Script.sol";
-import {TradeLayer} from "../contracts/TradeLayer.sol";
-import {MockUSDC} from "../contracts/mocks/MockUSDC.sol";
-import {MockPyth} from "../contracts/mocks/MockPyth.sol";
+import { TradeLayer } from "../contracts/TradeLayer.sol";
+import { MockUSDC } from "../contracts/mocks/MockUSDC.sol";
+import { MockPyth } from "../contracts/mocks/MockPyth.sol";
 
 /// @notice Deploys TradeLayer with network-appropriate dependencies.
 ///
@@ -118,7 +118,9 @@ contract Deploy is Script {
 
     function _slice(bytes memory data, uint256 start, uint256 len) internal pure returns (bytes memory part) {
         part = new bytes(len);
-        for (uint256 i = 0; i < len && start + i < data.length; i++) part[i] = data[start + i];
+        for (uint256 i = 0; i < len && start + i < data.length; i++) {
+            part[i] = data[start + i];
+        }
     }
 
     function _split(string memory input, string memory sep) internal pure returns (string[] memory parts) {
@@ -127,7 +129,9 @@ contract Deploy is Script {
         uint256 count = 1;
         for (uint256 i = 0; i + token.length <= src.length; i++) {
             bool hit = true;
-            for (uint256 j = 0; j < token.length; j++) if (src[i + j] != token[j]) hit = false;
+            for (uint256 j = 0; j < token.length; j++) {
+                if (src[i + j] != token[j]) hit = false;
+            }
             if (hit) count++;
         }
         parts = new string[](count);
@@ -138,7 +142,9 @@ contract Deploy is Script {
             bool atSep = false;
             if (i2 + token.length <= src.length) {
                 atSep = true;
-                for (uint256 j = 0; j < token.length; j++) if (src[i2 + j] != token[j]) atSep = false;
+                for (uint256 j = 0; j < token.length; j++) {
+                    if (src[i2 + j] != token[j]) atSep = false;
+                }
             } else if (i2 == src.length) {
                 atSep = true;
             }
