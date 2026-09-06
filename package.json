@@ -16,6 +16,8 @@
     "compile": "yarn foundry:compile",
     "deploy": "yarn foundry:deploy",
     "deploy:hedera-testnet": "yarn workspace @se-2/foundry deploy-hedera-testnet",
+    "ats:issue": "yarn workspace @tradelayer/ats issue-equity",
+    "ats:lifecycle": "yarn workspace @tradelayer/ats lifecycle",
     "flatten": "yarn foundry:flatten",
     "fork": "yarn foundry:fork",
     "format": "yarn foundry:format",
