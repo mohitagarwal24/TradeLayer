@@ -86,8 +86,8 @@ orders, portfolio holdings via `getStockHoldings`.
 
 | Component | Intended role | Actual state |
 |---|---|---|
-| **Hedera Asset Tokenization Studio (ATS)** | Re-issue DSTOCK as an ATS ERC-3643 token with KYC/compliance | In progress — ETHOnline Tokenization prize track |
-| **x402 / Blocky402 agentic payments** | Pay-per-call order-status API settled in HTS USDC | In progress — ETHOnline Agentic Payments prize track |
+| **Hedera Asset Tokenization Studio (ATS)** | Re-issue DSTOCK as an ATS ERC-3643 token with KYC/compliance | Implemented — TradeLayer mints/burns via `IAtsSecurityToken`; `packages/ats` issues equity + lifecycle demo |
+| **x402 / Blocky402 agentic payments** | Pay-per-call order-status API settled in HTS USDC | Implemented — `GET /order-status/:id` and `/portfolio/:addr` gated via Blocky402; `npm run agent:x402` |
 | **Lit Protocol MPC** | Threshold-sign settlements | Not implemented — backend uses a single hot key |
 | **Chainlink Proof of Reserve** | Broker inventory attestations | Not implemented |
 
@@ -193,6 +193,25 @@ These describe the **intended** end-state, including components still in progres
 
 ---
 
+## Hedera prize tracks
+
+### Tokenization (ATS)
+
+1. `cd packages/ats && yarn issue-equity` — create DSTOCK equity via ATS factory (MetaMask on Hedera testnet).
+2. Put the printed `evmDiamondAddress` into `packages/foundry/.env` as `ATS_DSTOCK=0x...`.
+3. `yarn deploy:hedera-testnet` then grant TradeLayer the ATS Minter/Agent role.
+4. `yarn workspace @tradelayer/ats lifecycle` — KYC grant + transfer + freeze (required lifecycle op).
+5. `make -C packages/foundry verify ADDRESS=0x...` — Sourcify / HashScan verification.
+
+Local Anvil uses `MockAtsSecurityToken` automatically (`yarn chain` + `yarn deploy`).
+
+### Agentic payments (x402)
+
+1. Fund a Hedera testnet account; set `X402_PAY_TO`, `HEDERA_ACCOUNT_ID`, `HEDERA_PRIVATE_KEY` in `backend/.env`.
+2. Optional: create an HCS topic and set `HCS_AUDIT_TOPIC` for payment audit trails.
+3. `cd backend && npm start` — exposes paid `GET /order-status/:orderId` and `GET /portfolio/:address`.
+4. `cd backend && npm run agent:x402` — agent discovers 402, pays via Blocky402, completes one request.
+
 ## Roadmap (ETHOnline 2026)
 
 1. **ATS migration** — issue DSTOCK via Asset Tokenization Studio (ERC-3643) with KYC/compliance on
@@ -202,3 +221,12 @@ These describe the **intended** end-state, including components still in progres
 3. **Bind settlement to intent** — commit `keccak256(orderPreimage)` at request time.
 4. **Cancellation path** with timeout for locked redeem / escrowed buy USDC.
 5. **Replace single hot signing key** with threshold signing.
+
+
+## Demo recording checklist
+
+Two ≤5-minute videos for Hedera prize qualification (record when testnet keys are funded):
+
+1. **ATS tokenization** — issue/show DSTOCK diamond on HashScan, grant KYC, compliance transfer, TradeLayer buy settle minting ATS shares, Sourcify-verified TradeLayer.
+2. **x402 agentic payment** — start backend, run `npm run agent:x402`, show 402 → Blocky402 settle → paid order-status JSON; optional HCS topic message.
+
