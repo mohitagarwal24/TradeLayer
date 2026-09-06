@@ -2,32 +2,26 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Script.sol";
-import { TradeLayer } from "../contracts/TradeLayer.sol";
-import { MockUSDC } from "../contracts/mocks/MockUSDC.sol";
-import { MockPyth } from "../contracts/mocks/MockPyth.sol";
+import {TradeLayer} from "../contracts/TradeLayer.sol";
+import {MockUSDC} from "../contracts/mocks/MockUSDC.sol";
+import {MockPyth} from "../contracts/mocks/MockPyth.sol";
+import {MockAtsSecurityToken} from "../contracts/mocks/MockAtsSecurityToken.sol";
 
 /// @notice Deploys TradeLayer with network-appropriate dependencies.
 ///
-/// Localhost (anvil): deploys a local USDC and a local Pyth stand-in, then
-/// seeds it with LIVE prices fetched from Pyth's public Hermes API, so even
-/// local demos trade at real market rates.
+/// Localhost (anvil): deploys local USDC, Pyth stand-in, and MockAtsSecurityToken
+/// (ERC-3643-style KYC equity), seeds live Hermes prices, funds demo liquidity.
 ///
-/// Hedera testnet (chain 296): wires the official Circle USDC (HTS token
-/// 0.0.429274) and Pyth's on-chain contract. Prices flow via real Hermes
-/// update payloads; nothing is seeded.
+/// Hedera testnet (chain 296): wires Circle HTS USDC, on-chain Pyth, and an
+/// ATS-issued DSTOCK address from env `ATS_DSTOCK` (EVM address of the equity
+/// diamond created via Asset Tokenization Studio).
 contract Deploy is Script {
-    // Chain IDs
     uint256 constant ANVIL = 31_337;
     uint256 constant HEDERA_TESTNET = 296;
 
-    // Hedera testnet constants
-    // Circle's native USDC is HTS token 0.0.429274; the JSON-RPC relay
-    // exposes HTS tokens at long-zero addresses (token id left-padded).
     address constant HEDERA_TESTNET_USDC = 0x0000000000000000000000000000000000068cDa;
-    // Pyth contract on Hedera testnet (hashscan 0.0.3042133).
     address constant HEDERA_TESTNET_PYTH = 0xA2aa501b19aff244D90cc15a4Cf739D2725B5729;
 
-    // Pyth equity feed IDs are chain-agnostic.
     bytes32 constant AAPL_ID = 0x49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175084a5ad55688;
     bytes32 constant GOOGL_ID = 0x5a48c03e9b9cb337801073ed9d166817473697efff0d138874e0f6a33d6d5aa6;
     bytes32 constant TSLA_ID = 0x16dad506d7db8da01c87581c87ca897a012a153557d4d578c3b9c9e1bc0632f1;
@@ -37,8 +31,6 @@ contract Deploy is Script {
         uint256 deployerKey = vm.envOr("PRIVATE_KEY", uint256(0));
         uint256 chainId = block.chainid;
 
-        // Local chains can use anvil's well-known dev account when no key is
-        // configured; live networks must provide one.
         if (deployerKey == 0) {
             require(
                 chainId == ANVIL,
@@ -57,11 +49,16 @@ contract Deploy is Script {
 
             MockUSDC usdc = new MockUSDC();
             MockPyth pyth = new MockPyth();
-            TradeLayer tradeLayer = new TradeLayer(address(usdc), address(pyth));
+            MockAtsSecurityToken dstock = new MockAtsSecurityToken("TradeLayer Equity", "DSTOCK");
+            TradeLayer tradeLayer = new TradeLayer(address(usdc), address(pyth), address(dstock));
+
+            // TradeLayer must be the ATS agent to mint/burn on settlement.
+            dstock.setAgent(address(tradeLayer));
+            // KYC the deployer so demo secondary transfers work after mint.
+            dstock.grantKyc(deployer);
 
             _seedLivePrices(address(pyth));
 
-            // Fund the deployer for demo trades (10k USDC).
             usdc.mint(deployer, 10_000e6);
             usdc.transfer(address(tradeLayer), 500_000e6);
 
@@ -69,17 +66,22 @@ contract Deploy is Script {
 
             console.log("LocalUSDC:", address(usdc));
             console.log("LocalPyth:", address(pyth));
+            console.log("DSTOCK (Mock ATS):", address(dstock));
             console.log("TradeLayer:", address(tradeLayer));
-            console.log("Seeded live AAPL/GOOGL/TSLA/MSFT prices from Hermes; funded demo liquidity.");
+            console.log("Seeded live prices from Hermes; TradeLayer is ATS agent.");
         } else if (chainId == HEDERA_TESTNET) {
+            address atsDstock = vm.envAddress("ATS_DSTOCK");
+            require(atsDstock != address(0), "Set ATS_DSTOCK to the ATS equity EVM address");
+
             vm.startBroadcast(deployerKey);
-            TradeLayer tradeLayer = new TradeLayer(HEDERA_TESTNET_USDC, HEDERA_TESTNET_PYTH);
+            TradeLayer tradeLayer = new TradeLayer(HEDERA_TESTNET_USDC, HEDERA_TESTNET_PYTH, atsDstock);
             vm.stopBroadcast();
 
             console.log("USDC (HTS 0.0.429274):", HEDERA_TESTNET_USDC);
             console.log("Pyth:", HEDERA_TESTNET_PYTH);
+            console.log("DSTOCK (ATS):", atsDstock);
             console.log("TradeLayer:", address(tradeLayer));
-            console.log("Next: forge verify-contract --chain-id 296 --verifier sourcify");
+            console.log("Next: grant TradeLayer the ATS Minter/Agent role, then verify on Sourcify.");
         } else {
             revert(string(abi.encodePacked("Unsupported chain id: ", vm.toString(chainId))));
         }
@@ -87,8 +89,6 @@ contract Deploy is Script {
         console.log("==============================================");
     }
 
-    /// Pulls the latest price for each feed from Hermes and stores it in the
-    /// local Pyth stand-in at expo -5, matching how equities are published.
     function _seedLivePrices(address pyth) internal {
         string[] memory cmds = new string[](3);
         cmds[0] = "bash";
@@ -104,9 +104,6 @@ contract Deploy is Script {
         _applyLine(lines[3], MSFT_ID, pyth);
     }
 
-    /// Hermes returns feeds in request order; match by position and sanity-
-    /// check that the returned id equals the expected one before seeding.
-    /// Equities publish at expo -5 (e.g. 30992821 -> $309.92821).
     function _applyLine(string memory line, bytes32 expectedId, address pyth) internal {
         bytes memory b = bytes(line);
         if (b.length < 66) revert("Deploy: bad hermes line");

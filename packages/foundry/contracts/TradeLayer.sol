@@ -1,35 +1,34 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IPyth } from "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
-import { PythStructs } from "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IPyth} from "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
+import {PythStructs} from "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
+import {IAtsSecurityToken} from "./interfaces/IAtsSecurityToken.sol";
 
-contract TradeLayer is ERC20("dstock", "DSTOCK") {
+/// @notice Escrow + settlement orchestrator for equity positions.
+/// DSTOCK is an external ATS / ERC-3643 security token (MockAtsSecurityToken
+/// locally; Asset Tokenization Studio diamond on Hedera testnet). TradeLayer
+/// must hold the agent/minter role on that token.
+contract TradeLayer {
     error TradeLayer__OrderIdUsed(string id);
 
     using SafeERC20 for IERC20;
 
     IERC20 public immutable usdc;
     IPyth public immutable pyth;
+    IAtsSecurityToken public immutable dstock;
     address public owner;
-    address public backendWallet; // may call fulfillRequest
+    address public backendWallet;
 
     mapping(address => mapping(string => uint256)) public totalHoldings;
     mapping(address => string[]) public stockHoldings;
-    mapping(string => bool) public orderProcessed; // settled exactly once
+    mapping(string => bool) public orderProcessed;
     mapping(string => bool) public orderIdUsed;
     mapping(string => bytes32) public stockPriceIds;
 
-    /// @notice DSTOCK committed to an in-flight redeem request, so the same
-    /// balance cannot back two redemptions at once.
     mapping(address => uint256) public lockedForRedeem;
-
-    /// @notice USDC escrowed against buy requests that have not settled yet.
-    /// Redemption payouts may only draw on the balance above this figure, so a
-    /// redeem can never be funded out of another user's unfilled purchase.
     uint256 public escrowedBuyUsdc;
 
     modifier onlyBackend() {
@@ -68,11 +67,13 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
         uint256 usdcAmount
     );
 
-    constructor(address _usdc, address _pyth) {
+    constructor(address _usdc, address _pyth, address _dstock) {
         require(_usdc != address(0), "Invalid USDC address");
         require(_pyth != address(0), "Invalid Pyth address");
+        require(_dstock != address(0), "Invalid DSTOCK address");
         usdc = IERC20(_usdc);
         pyth = IPyth(_pyth);
+        dstock = IAtsSecurityToken(_dstock);
         owner = msg.sender;
         backendWallet = msg.sender;
         stockPriceIds["AAPL"] = 0x49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175084a5ad55688;
@@ -81,12 +82,30 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
         stockPriceIds["MSFT"] = 0xd0ca23c1cc005e004ccf1db5bf76aeb6a49218f43dac3d4b275e92de12ded4d1;
     }
 
-    /* ---------- ORACLE FUNCTIONS ---------- */
+    /* ---------- POSITION TOKEN VIEWS (proxy ATS) ---------- */
 
-    /// @notice Get current price for a stock from Pyth
-    /// @param stockSymbol Stock ticker (e.g., "AAPL", "GOOGL", "TSLA", "MSFT")
-    /// @param priceUpdate Price update data from Pyth Hermes API
-    /// @return price Current price in USD with 18 decimals
+    function balanceOf(address account) external view returns (uint256) {
+        return dstock.balanceOf(account);
+    }
+
+    function totalSupply() external view returns (uint256) {
+        return dstock.totalSupply();
+    }
+
+    function decimals() external view returns (uint8) {
+        return dstock.decimals();
+    }
+
+    function name() external view returns (string memory) {
+        return dstock.name();
+    }
+
+    function symbol() external view returns (string memory) {
+        return dstock.symbol();
+    }
+
+    /* ---------- ORACLE ---------- */
+
     function getStockPrice(string memory stockSymbol, bytes[] calldata priceUpdate)
         external
         payable
@@ -95,69 +114,48 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
         bytes32 priceId = stockPriceIds[stockSymbol];
         require(priceId != bytes32(0), "Stock not supported");
 
-        // Update price feed if data provided
         if (priceUpdate.length > 0) {
             uint256 fee = pyth.getUpdateFee(priceUpdate);
             require(msg.value >= fee, "Insufficient fee");
-
-            pyth.updatePriceFeeds{ value: fee }(priceUpdate);
-
-            // Refund excess
+            pyth.updatePriceFeeds{value: fee}(priceUpdate);
             if (msg.value > fee) {
-                (bool success,) = msg.sender.call{ value: msg.value - fee }("");
+                (bool success,) = msg.sender.call{value: msg.value - fee}("");
                 require(success, "Refund failed");
             }
         }
 
-        // Get price (must be < 60 seconds old)
         PythStructs.Price memory pythPrice = pyth.getPriceNoOlderThan(priceId, 60);
         require(pythPrice.price > 0, "Invalid price");
-
-        // Convert to 18 decimals
-        uint256 price = _scalePythPrice(pythPrice.price, pythPrice.expo);
-
-        // emit StockPriceQueried(stockSymbol, price, block.timestamp);
-
-        return price;
-    }
-
-    /// @notice Get latest price without age check (use cautiously!)
-    function getStockPriceUnsafe(string memory stockSymbol) external view returns (uint256) {
-        bytes32 priceId = stockPriceIds[stockSymbol];
-        require(priceId != bytes32(0), "Stock not supported");
-
-        PythStructs.Price memory pythPrice = pyth.getPrice(priceId);
-        require(pythPrice.price > 0, "Invalid price");
-
         return _scalePythPrice(pythPrice.price, pythPrice.expo);
     }
 
-    /// @notice Add support for a new stock
-    function addStock(string memory symbol, bytes32 priceId) external onlyOwner {
-        require(priceId != bytes32(0), "Invalid price ID");
-        stockPriceIds[symbol] = priceId;
+    function getStockPriceUnsafe(string memory stockSymbol) external view returns (uint256) {
+        bytes32 priceId = stockPriceIds[stockSymbol];
+        require(priceId != bytes32(0), "Stock not supported");
+        PythStructs.Price memory pythPrice = pyth.getPrice(priceId);
+        require(pythPrice.price > 0, "Invalid price");
+        return _scalePythPrice(pythPrice.price, pythPrice.expo);
     }
 
-    /// @notice Rotate the wallet allowed to settle requests
+    function addStock(string memory symbol_, bytes32 priceId) external onlyOwner {
+        require(priceId != bytes32(0), "Invalid price ID");
+        stockPriceIds[symbol_] = priceId;
+    }
+
     function setBackendWallet(address _backendWallet) external onlyOwner {
         require(_backendWallet != address(0), "Invalid backend");
         backendWallet = _backendWallet;
     }
 
-    /// @notice Check if a stock is supported
-    function isStockSupported(string memory symbol) external view returns (bool) {
-        return stockPriceIds[symbol] != bytes32(0);
+    function isStockSupported(string memory symbol_) external view returns (bool) {
+        return stockPriceIds[symbol_] != bytes32(0);
     }
-
-    /* ---------- INTERNAL HELPERS ---------- */
 
     function _scalePythPrice(int64 price, int32 expo) internal pure returns (uint256) {
         require(price > 0, "Negative price");
-
         uint256 priceUint = uint256(uint64(price));
         int32 targetDecimals = 18;
         int32 scalingExponent = targetDecimals + expo;
-
         if (scalingExponent >= 0) {
             return priceUint * (10 ** uint32(scalingExponent));
         } else {
@@ -172,41 +170,30 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
         require(amountOfUsdc > 0, "amount cannot be zero");
 
         orderIdUsed[orderId] = true;
-
         usdc.safeTransferFrom(msg.sender, address(this), amountOfUsdc);
         escrowedBuyUsdc += amountOfUsdc;
-
         requests[orderId] =
-            Request({ requester: msg.sender, usdcBalance: amountOfUsdc, tokenBalance: 0, isRedeem: false });
-
+            Request({requester: msg.sender, usdcBalance: amountOfUsdc, tokenBalance: 0, isRedeem: false});
         emit RequestCreated(orderId, encryptedOrder);
     }
 
     function redeemStock(string memory orderId, string memory encryptedOrder, uint256 amount) external {
         require(!orderIdUsed[orderId], TradeLayer__OrderIdUsed(orderId));
         require(amount > 0, "amount cannot be zero");
-
-        // Lock rather than burn: the encrypted order does not reveal which stock
-        // is being sold, so totalHoldings cannot be decremented until settlement.
-        // Locking keeps totalSupply == sum(totalHoldings) intact while still
-        // preventing the same balance from backing two redeem requests.
-        require(balanceOf(msg.sender) - lockedForRedeem[msg.sender] >= amount, "not enough unlocked DSTOCK");
+        require(dstock.balanceOf(msg.sender) - lockedForRedeem[msg.sender] >= amount, "not enough unlocked DSTOCK");
 
         orderIdUsed[orderId] = true;
         lockedForRedeem[msg.sender] += amount;
-
-        requests[orderId] = Request({ requester: msg.sender, usdcBalance: 0, tokenBalance: amount, isRedeem: true });
-
+        requests[orderId] = Request({requester: msg.sender, usdcBalance: 0, tokenBalance: amount, isRedeem: true});
         emit RequestCreated(orderId, encryptedOrder);
     }
 
-    /* ---------- BACKEND ORACLE CALL ---------- */
+    /* ---------- BACKEND SETTLEMENT ---------- */
 
     function fulfillRequest(string memory orderId, bytes memory result) external onlyBackend {
         Request memory req = requests[orderId];
         require(req.requester != address(0), "invalid order");
-
-        require(!orderProcessed[orderId], "Order already processed"); // prevent incorrect accounting
+        require(!orderProcessed[orderId], "Order already processed");
         orderProcessed[orderId] = true;
 
         if (req.isRedeem) {
@@ -226,36 +213,25 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
         );
     }
 
-    /* ---------- INTERNAL LOGIC ---------- */
-
     function _processPurchase(string memory orderId, bytes memory result) internal {
         Result memory res = abi.decode(result, (Result));
-
         uint256 qty = res.stockQuantity;
-        // Read the request by the caller-supplied orderId, not res.orderId, so a
-        // settlement cannot be attributed to a different user's order.
         Request memory req = requests[orderId];
         address user = req.requester;
 
-        // A partial fill leaves unspent USDC that belongs to the user. The refund
-        // can never exceed what this order actually escrowed.
         uint256 escrowed = req.usdcBalance;
         uint256 refund = res.amountToRefund;
         require(refund <= escrowed, "refund exceeds escrow");
-
-        // The order is settled, so its escrow is no longer reserved: the refund
-        // goes back to the user and the remainder becomes free protocol balance.
         escrowedBuyUsdc -= escrowed;
 
-        // Track stock positions
         if (!_ownsStock(user, res.stockName)) {
             stockHoldings[user].push(res.stockName);
         }
-
         totalHoldings[user][res.stockName] += qty;
 
-        // Mint non-transferable DSTOCK item tokens
-        _mint(user, qty);
+        // ATS mint requires the user to be KYC'd; the backend / issuer grants
+        // KYC before settlement in the Hedera flow (tests grant in the handler).
+        dstock.mint(user, qty);
 
         if (refund > 0) {
             usdc.safeTransfer(user, refund);
@@ -264,16 +240,13 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
 
     function _processRedemption(string memory orderId, bytes memory result) internal {
         Result memory res = abi.decode(result, (Result));
-
         Request memory req = requests[orderId];
         address user = req.requester;
 
-        // The settled quantity must match what the user committed at request time.
         uint256 qty = req.tokenBalance;
         require(res.stockQuantity == qty, "quantity mismatch");
         require(totalHoldings[user][res.stockName] >= qty, "insufficient holdings");
 
-        // Only the balance not reserved against pending buys may be paid out.
         uint256 balance = usdc.balanceOf(address(this));
         uint256 reserved = escrowedBuyUsdc;
         uint256 free = balance > reserved ? balance - reserved : 0;
@@ -282,15 +255,10 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
         totalHoldings[user][res.stockName] -= qty;
         lockedForRedeem[user] -= qty;
 
-        // Send the sale proceeds reported by the backend.
         usdc.safeTransfer(user, res.amountToRefund);
-        _burn(user, qty);
+        dstock.burn(user, qty);
     }
 
-    /* ---------- HELPERS ---------- */
-
-    /// @notice Full stock list for a user. The auto-generated getter for the
-    /// public mapping only exposes element-by-element access.
     function getStockHoldings(address user) external view returns (string[] memory) {
         return stockHoldings[user];
     }
@@ -303,17 +271,5 @@ contract TradeLayer is ERC20("dstock", "DSTOCK") {
             }
         }
         return false;
-    }
-
-    function transfer(address to, uint256 amount) public virtual override returns (bool) {
-        revert("Transfers are disabled");
-    }
-
-    function transferFrom(address from, address to, uint256 amount) public virtual override returns (bool) {
-        revert("Transfers are disabled");
-    }
-
-    function decimals() public pure override returns (uint8) {
-        return 0; // whole stock units only
     }
 }

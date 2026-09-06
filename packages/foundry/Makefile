@@ -63,7 +63,11 @@ verify:
 	fi
 	forge verify-contract --chain-id 296 --verifier sourcify $(ADDRESS) TradeLayer
 
-# Deploy to Hedera testnet (requires PRIVATE_KEY in packages/foundry/.env)
+# ATS lifecycle demo (KYC + transfer). Requires ATS_DSTOCK in env.
+ats-lifecycle:
+	forge script script/AtsLifecycle.s.sol --rpc-url $(RPC_URL) --broadcast --ffi
+
+# Deploy to Hedera testnet (requires PRIVATE_KEY + ATS_DSTOCK in packages/foundry/.env)
 deploy-hedera-testnet:
 	@if [ -z "$(PRIVATE_KEY)" ] && ! rg -q "^PRIVATE_KEY=0x" .env 2>/dev/null; then 		echo "Error: set PRIVATE_KEY in packages/foundry/.env first (yarn generate)"; 		exit 1; 	fi
 	forge script script/Deploy.s.sol --rpc-url hederaTestnet --broadcast --ffi --slow
