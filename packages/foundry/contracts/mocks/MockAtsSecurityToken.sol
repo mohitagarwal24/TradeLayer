@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IAtsSecurityToken} from "../interfaces/IAtsSecurityToken.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { IAtsSecurityToken } from "../interfaces/IAtsSecurityToken.sol";
 
 /// @notice Local stand-in for an ATS ERC-3643 equity token.
 /// Agent (TradeLayer) can mint/burn; transfers require KYC and reject frozen
@@ -14,6 +14,7 @@ contract MockAtsSecurityToken is ERC20, IAtsSecurityToken {
 
     mapping(address => bool) public kyc;
     mapping(address => bool) public frozen;
+    mapping(address => uint256) public frozenAmount;
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Not owner");
@@ -45,48 +46,56 @@ contract MockAtsSecurityToken is ERC20, IAtsSecurityToken {
     }
 
     function burn(address from, uint256 amount) external override onlyAgent {
+        require(balanceOf(from) >= amount, "insufficient unfrozen balance");
         _burn(from, amount);
     }
 
-    function grantKyc(address account) external override onlyOwner {
+    function freezePartialTokens(address account, uint256 amount) external override onlyAgent {
+        require(amount > 0, "zero freeze");
+        require(balanceOf(account) >= amount, "insufficient unfrozen balance");
+        frozenAmount[account] += amount;
+    }
+
+    function unfreezePartialTokens(address account, uint256 amount) external override onlyAgent {
+        require(frozenAmount[account] >= amount, "insufficient frozen balance");
+        frozenAmount[account] -= amount;
+    }
+
+    function grantKyc(address account) external onlyOwner {
         kyc[account] = true;
     }
 
-    function revokeKyc(address account) external override onlyOwner {
+    function revokeKyc(address account) external onlyOwner {
         kyc[account] = false;
     }
 
-    function isKyc(address account) external view override returns (bool) {
+    function isKyc(address account) external view returns (bool) {
         return kyc[account];
     }
 
-    function setAddressFrozen(address account, bool _frozen) external override onlyOwner {
+    function setAddressFrozen(address account, bool _frozen) external onlyOwner {
         frozen[account] = _frozen;
     }
 
-    function isFrozen(address account) external view override returns (bool) {
+    function isFrozen(address account) external view returns (bool) {
         return frozen[account];
     }
 
-    function pause() external override onlyOwner {
+    function pause() external onlyOwner {
         paused = true;
     }
 
-    function unpause() external override onlyOwner {
+    function unpause() external onlyOwner {
         paused = false;
     }
 
-    function transfer(address to, uint256 amount) public override(ERC20, IAtsSecurityToken) returns (bool) {
-        _complianceCheck(msg.sender, to);
+    function transfer(address to, uint256 amount) public override returns (bool) {
+        _complianceCheck(msg.sender, to, amount);
         return super.transfer(to, amount);
     }
 
-    function transferFrom(address from, address to, uint256 amount)
-        public
-        override(ERC20, IAtsSecurityToken)
-        returns (bool)
-    {
-        _complianceCheck(from, to);
+    function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
+        _complianceCheck(from, to, amount);
         return super.transferFrom(from, to, amount);
     }
 
@@ -107,12 +116,13 @@ contract MockAtsSecurityToken is ERC20, IAtsSecurityToken {
     }
 
     function balanceOf(address account) public view override(ERC20, IAtsSecurityToken) returns (uint256) {
-        return super.balanceOf(account);
+        return super.balanceOf(account) - frozenAmount[account];
     }
 
-    function _complianceCheck(address from, address to) internal view {
+    function _complianceCheck(address from, address to, uint256 amount) internal view {
         require(!paused, "paused");
         require(kyc[from] && kyc[to], "KYC required");
         require(!frozen[from] && !frozen[to], "frozen");
+        require(balanceOf(from) >= amount, "insufficient unfrozen balance");
     }
 }

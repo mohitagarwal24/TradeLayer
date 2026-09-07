@@ -11,6 +11,7 @@
     "clean": "forge clean",
     "compile": "make compile",
     "deploy": "node scripts-js/parseArgs.js",
+    "deploy-hedera-testnet": "make deploy-hedera-testnet",
     "flatten": "make flatten",
     "fork": "make fork FORK_URL=${1:-mainnet}",
     "format": "make format",
