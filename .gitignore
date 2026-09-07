@@ -25,6 +25,10 @@ dist
 # env
 packages/nextjs/.env
 backend/.env
+backend/.data/
 
 # local agent tool permissions
 .claude/
+
+# personal learning/usage notes (stay on this machine only)
+docs/local/
