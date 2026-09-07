@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "issue-equity": "tsx src/issueEquity.ts",
+    "configure-tradelayer": "tsx src/configureTradeLayer.ts",
     "lifecycle": "tsx src/lifecycleDemo.ts",
     "check-types": "tsc --noEmit"
   },

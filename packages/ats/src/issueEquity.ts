@@ -10,7 +10,14 @@
  *   cd packages/ats && yarn issue-equity
  */
 import "reflect-metadata";
-import { Network, Equity, CreateEquityRequest, SupportedWallets } from "@hashgraph/asset-tokenization-sdk";
+import {
+  Network,
+  Equity,
+  CreateEquityRequest,
+  SupportedWallets,
+  InitializationRequest,
+  ConnectRequest,
+} from "@hashgraph/asset-tokenization-sdk";
 import { HEDERA_TESTNET } from "./config.js";
 
 async function main() {
@@ -18,23 +25,27 @@ async function main() {
   console.log("  factory:", HEDERA_TESTNET.factory);
   console.log("  resolver:", HEDERA_TESTNET.resolver);
 
-  await Network.init({
-    network: HEDERA_TESTNET.network,
-    mirrorNode: { name: "hedera-testnet-mirror", baseUrl: HEDERA_TESTNET.mirrorNode },
-    rpcNode: { name: "hashio", baseUrl: HEDERA_TESTNET.rpcNode },
-    configuration: {
-      factoryAddress: HEDERA_TESTNET.factory,
-      resolverAddress: HEDERA_TESTNET.resolver,
-    },
-  });
+  await Network.init(
+    new InitializationRequest({
+      network: HEDERA_TESTNET.network,
+      mirrorNode: { name: "hedera-testnet-mirror", baseUrl: HEDERA_TESTNET.mirrorNode },
+      rpcNode: { name: "hashio", baseUrl: HEDERA_TESTNET.rpcNode },
+      configuration: {
+        factoryAddress: HEDERA_TESTNET.factory,
+        resolverAddress: HEDERA_TESTNET.resolver,
+      },
+    }),
+  );
 
   console.log("\nConnect MetaMask (Hedera testnet profile) when prompted…");
-  await Network.connect({
-    network: HEDERA_TESTNET.network,
-    mirrorNode: { name: "hedera-testnet-mirror", baseUrl: HEDERA_TESTNET.mirrorNode },
-    rpcNode: { name: "hashio", baseUrl: HEDERA_TESTNET.rpcNode },
-    wallet: SupportedWallets.METAMASK,
-  });
+  await Network.connect(
+    new ConnectRequest({
+      network: HEDERA_TESTNET.network,
+      mirrorNode: { name: "hedera-testnet-mirror", baseUrl: HEDERA_TESTNET.mirrorNode },
+      rpcNode: { name: "hashio", baseUrl: HEDERA_TESTNET.rpcNode },
+      wallet: SupportedWallets.METAMASK,
+    }),
+  );
 
   // ISO 4217 numeric code for USD as hex ("USD" → 0x555344)
   const usdCurrency = "0x555344";

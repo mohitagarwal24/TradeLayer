@@ -1,23 +1,19 @@
 /**
  * Lifecycle demo against a deployed ATS / MockAts security token:
- *   grant KYC → mint (as agent) → compliance-checked transfer → freeze check.
- *
- * Works on Anvil (MockAtsSecurityToken) and Hedera testnet (ATS diamond that
- * exposes the same agent surface). This is the "lifecycle operation" required
- * by the Hedera Tokenization prize.
+ *   verify real KYC → mint → compliance-checked transfer → freeze check.
  *
  * Env:
- *   RPC_URL          default http://127.0.0.1:8545
+ *   RPC_URL          default Hedera testnet Hashio
  *   PRIVATE_KEY      issuer / agent key
  *   ATS_DSTOCK       security token address
- *   DEMO_RECIPIENT   address to KYC + receive a transfer (optional)
+ *   DEMO_RECIPIENT   previously KYC-approved recipient address
  */
 import "dotenv/config";
-import { Contract, JsonRpcProvider, Wallet, parseUnits } from "ethers";
+import { Contract, JsonRpcProvider, Wallet } from "ethers";
 import { ATS_SECURITY_ABI } from "./config.js";
 
 async function main() {
-  const rpc = process.env.RPC_URL ?? "http://127.0.0.1:8545";
+  const rpc = process.env.RPC_URL ?? "https://testnet.hashio.io/api";
   const pk = process.env.PRIVATE_KEY;
   const tokenAddr = process.env.ATS_DSTOCK;
   if (!pk || !tokenAddr) {
@@ -33,30 +29,27 @@ async function main() {
   console.log(`Token ${name} (${symbol}) at ${tokenAddr}`);
   console.log(`Issuer/agent: ${wallet.address}`);
 
-  const recipient = process.env.DEMO_RECIPIENT ?? Wallet.createRandom().address;
-  console.log(`\n1. Grant KYC → ${recipient}`);
-  await (await token.grantKyc(recipient)).wait();
-  console.log("   isKyc:", await token.isKyc(recipient));
+  const recipient = process.env.DEMO_RECIPIENT;
+  if (!recipient) throw new Error("Set DEMO_RECIPIENT to a real ATS KYC-approved account");
 
-  if (!(await token.isKyc(wallet.address))) {
-    console.log("2. Grant KYC → issuer");
-    await (await token.grantKyc(wallet.address)).wait();
+  console.log(`\n1. Verify ATS KYC for issuer and recipient ${recipient}`);
+  const issuerKyc = Number(await token.getKycStatusFor(wallet.address));
+  const recipientKyc = Number(await token.getKycStatusFor(recipient));
+  if (issuerKyc !== 1 || recipientKyc !== 1) {
+    throw new Error(`ATS KYC required before lifecycle execution (issuer=${issuerKyc}, recipient=${recipientKyc})`);
   }
+  console.log("   issuer KYC: granted; recipient KYC: granted");
 
   const mintAmount = 10n;
-  console.log(`\n3. Mint ${mintAmount} to issuer (agent/owner role)`);
-  try {
-    await (await token.mint(wallet.address, mintAmount)).wait();
-  } catch (err) {
-    console.warn("   mint skipped/failed:", (err as Error).message.split("\n")[0]);
-  }
+  console.log(`\n2. Mint ${mintAmount} to issuer`);
+  await (await token.mint(wallet.address, mintAmount)).wait();
   console.log("   issuer balance:", (await token.balanceOf(wallet.address)).toString());
 
-  console.log(`\n4. Compliance transfer 1 ${symbol} → recipient`);
+  console.log(`\n3. Compliance transfer 1 ${symbol} → recipient`);
   await (await token.transfer(recipient, 1n)).wait();
   console.log("   recipient balance:", (await token.balanceOf(recipient)).toString());
 
-  console.log("\n5. Freeze recipient, assert transfer reverts, then unfreeze");
+  console.log("\n4. Freeze recipient, assert transfer reverts, then unfreeze");
   await (await token.setAddressFrozen(recipient, true)).wait();
   let blocked = false;
   try {
@@ -68,7 +61,11 @@ async function main() {
   console.log("   transfer while frozen blocked:", blocked);
   await (await token.setAddressFrozen(recipient, false)).wait();
 
-  console.log("\nLifecycle demo complete — KYC grant + transfer + freeze exercised.");
+  console.log("\n5. Burn demo units to restore pre-demo balances");
+  await (await token.burn(recipient, 1n)).wait();
+  await (await token.burn(wallet.address, mintAmount - 1n)).wait();
+
+  console.log("\nLifecycle demo complete — KYC, mint, transfer, freeze and burn exercised.");
 }
 
 main().catch((err) => {
