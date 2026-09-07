@@ -11,13 +11,16 @@ const WS_URL = process.env.HEDERA_WS_URL || "";
 
 export const provider = WS_URL
   ? new WebSocketProvider(WS_URL)
-  : new JsonRpcProvider(RPC_URL, { chainId: 296, name: "hedera-testnet" }, { staticNetwork: true });
+  : new JsonRpcProvider(
+      RPC_URL,
+      { chainId: 296, name: "hedera-testnet" },
+      // Hashio rejects eth_getFilterChanges inside JSON-RPC batches.
+      { staticNetwork: true, batchMaxCount: 1 },
+    );
 
 const pk = process.env.private_key;
 if (!pk) throw new Error("Missing private_key in backend/.env (the settle wallet's key)");
 export const wallet = new Wallet(pk.startsWith("0x") ? pk : `0x${pk}`, provider);
-
-console.log("backend settle wallet:", await wallet.getAddress());
 
 const contractAddress = process.env.contract || "";
 if (!contractAddress) throw new Error("Missing contract address in backend/.env");

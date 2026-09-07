@@ -9,7 +9,11 @@
   "scripts": {
     "start": "tsx index.ts",
     "agent:x402": "tsx scripts/x402Agent.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "associate:usdc": "tsx scripts/associateUsdc.ts",
+    "create:hcs-topic": "tsx scripts/createHcsTopic.ts",
+    "check-types": "tsc --noEmit",
+    "check:notional": "tsx scripts/checkNotionalMath.ts",
+    "test": "tsx scripts/checkNotionalMath.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
