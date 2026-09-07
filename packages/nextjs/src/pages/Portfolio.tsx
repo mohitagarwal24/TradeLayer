@@ -1,25 +1,24 @@
-import { useMemo } from "react";
-import { useAccount, useBalance } from "wagmi";
-import { formatUnits } from "viem";
-import { Wallet, ArrowRightLeft, Package, History } from "lucide-react";
+import { useState } from "react";
+import { useAccount, useBalance, useSignMessage } from "wagmi";
+import { formatUnits, getAddress } from "viem";
+import { toast } from "sonner";
+import { Wallet, ArrowRightLeft, Package, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth/useScaffoldReadContract";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
-import { fmtShares, fmtUsdc, shortOrderId, stockMeta } from "@/lib/format";
+import { fmtReceiptUnits, fmtReceiptValue, fmtUsdc } from "@/lib/format";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
-type Address = `0x${string}`;
+const BACKEND_API = import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000";
+
+type PrivatePosition = {
+  symbol: string;
+  shares: number;
+  receiptUnits: number;
+  depositedUsdc: number;
+};
 
 function ConnectPrompt() {
   return (
@@ -36,114 +35,75 @@ function ConnectPrompt() {
   );
 }
 
-function HoldingsTable({ address }: { address: Address }) {
-  const { data: stockList } = useScaffoldReadContract({
-    contractName: "TradeLayer",
-    functionName: "getStockHoldings",
-    args: [address],
-    watch: true,
-  });
+function PrivateHoldings({ address }: { address: `0x${string}` }) {
+  const { signMessageAsync } = useSignMessage();
+  const [positions, setPositions] = useState<PrivatePosition[] | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const { data: lockedForRedeem } = useScaffoldReadContract({
-    contractName: "TradeLayer",
-    functionName: "lockedForRedeem",
-    args: [address],
-    watch: true,
-  });
-
-  // Read each holding's quantity (hooks must be top-level; four known symbols).
-  const aaplQty = useScaffoldReadContract({
-    contractName: "TradeLayer",
-    functionName: "totalHoldings",
-    args: [address, "AAPL"],
-    watch: true,
-  }).data;
-  const googlQty = useScaffoldReadContract({
-    contractName: "TradeLayer",
-    functionName: "totalHoldings",
-    args: [address, "GOOGL"],
-    watch: true,
-  }).data;
-  const tslaQty = useScaffoldReadContract({
-    contractName: "TradeLayer",
-    functionName: "totalHoldings",
-    args: [address, "TSLA"],
-    watch: true,
-  }).data;
-  const msftQty = useScaffoldReadContract({
-    contractName: "TradeLayer",
-    functionName: "totalHoldings",
-    args: [address, "MSFT"],
-    watch: true,
-  }).data;
-
-  const quantities = useMemo<Record<string, bigint | undefined>>(
-    () => ({
-      AAPL: aaplQty,
-      GOOGL: googlQty,
-      TSLA: tslaQty,
-      MSFT: msftQty,
-    }),
-    [aaplQty, googlQty, tslaQty, msftQty],
-  );
-
-  const rows = useMemo(() => {
-    const holdings = ((stockList ?? []) as unknown as readonly string[]) ?? [];
-    return holdings.map((symbol) => ({
-      symbol,
-      qty: quantities[symbol] ?? 0n,
-      meta: stockMeta(symbol),
-    }));
-  }, [stockList, quantities]);
-
-  if (rows.length === 0) {
-    return (
-      <div className="py-10 text-center text-sm text-muted-foreground">
-        No positions yet. Head to <span className="font-medium text-foreground">Trade</span> to place your first order.
-      </div>
-    );
+  async function reveal() {
+    setLoading(true);
+    try {
+      const normalized = getAddress(address);
+      const timestamp = Date.now().toString();
+      const message = `TradeLayer private portfolio\nAddress: ${normalized}\nTimestamp: ${timestamp}`;
+      const signature = await signMessageAsync({ account: normalized, message });
+      const response = await fetch(`${BACKEND_API}/private-portfolio/${normalized}`, {
+        headers: {
+          "X-PORTFOLIO-TIMESTAMP": timestamp,
+          "X-PORTFOLIO-SIGNATURE": signature,
+        },
+      });
+      if (!response.ok) throw new Error((await response.json()).error ?? `backend ${response.status}`);
+      const body = (await response.json()) as { positions: PrivatePosition[] };
+      setPositions(body.positions);
+    } catch (error) {
+      toast.error("Could not reveal private portfolio", { description: (error as Error).message });
+    } finally {
+      setLoading(false);
+    }
   }
 
-  const totalLocked = lockedForRedeem ?? 0n;
-
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Stock</TableHead>
-          <TableHead className="text-right">Quantity</TableHead>
-          <TableHead className="text-right hidden sm:table-cell">Status</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => (
-          <TableRow key={row.symbol}>
-            <TableCell>
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg text-[11px] font-bold" style={{ backgroundColor: `${row.meta.color}22`, color: row.meta.color }}>
-                  {row.symbol.slice(0, 2)}
-                </span>
-                <div>
-                  <div className="font-medium">{row.symbol}</div>
-                  <div className="text-xs text-muted-foreground">{row.meta.name}</div>
-                </div>
-              </div>
-            </TableCell>
-            <TableCell className="text-right font-mono tabular-nums">{fmtShares(row.qty)}</TableCell>
-            <TableCell className="text-right hidden sm:table-cell">
-              <Badge variant="secondary" className="rounded-full">Held</Badge>
-            </TableCell>
-          </TableRow>
-        ))}
-        {totalLocked > 0n && (
-          <TableRow className="opacity-70">
-            <TableCell colSpan={3} className="text-xs text-warning">
-              {fmtShares(totalLocked)} DSTOCK locked across pending redemptions
-            </TableCell>
-          </TableRow>
+    <div className="flex items-start gap-3 py-6">
+      <ShieldCheck className="mt-0.5 h-5 w-5 text-primary" />
+      <div className="w-full">
+        <p className="font-medium">Individual stock positions are private</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          The chain exposes only your aggregate deposited value (DSTOCK). Fractional shares and per-asset receipt units
+          stay in TradeLayer&apos;s private settlement ledger.
+        </p>
+        {positions === null ? (
+          <Button className="mt-4" variant="secondary" onClick={reveal} disabled={loading}>
+            {loading ? "Verifying wallet…" : "Sign to reveal your positions"}
+          </Button>
+        ) : positions.length === 0 ? (
+          <p className="mt-4 text-sm">No settled positions yet.</p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-muted-foreground">
+                <tr>
+                  <th className="pb-2 font-medium">Asset</th>
+                  <th className="pb-2 font-medium">Fractional shares</th>
+                  <th className="pb-2 font-medium">Receipt units</th>
+                  <th className="pb-2 font-medium">Deposited value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {positions.map(position => (
+                  <tr key={position.symbol} className="border-t border-border/40">
+                    <td className="py-2 font-medium">{position.symbol}</td>
+                    <td className="py-2 font-mono tabular-nums">{position.shares.toFixed(6)}</td>
+                    <td className="py-2 font-mono tabular-nums">{fmtReceiptUnits(position.receiptUnits)}</td>
+                    <td className="py-2 font-mono tabular-nums">{fmtReceiptValue(position.receiptUnits)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </TableBody>
-    </Table>
+      </div>
+    </div>
   );
 }
 
@@ -178,7 +138,6 @@ export default function Portfolio() {
   return (
     <main className="min-h-screen pt-24 pb-16">
       <div className="container mx-auto px-4 space-y-6">
-        {/* Summary cards */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Card className="glass-card border-border/60">
             <CardHeader className="pb-1">
@@ -189,7 +148,9 @@ export default function Portfolio() {
             <CardContent>
               <div className="font-mono text-2xl font-semibold tabular-nums">{fmtUsdc(usdcBalance)}</div>
               <div className="text-xs text-muted-foreground">
-                {nativeBalance ? `${Number(formatUnits(nativeBalance.value, 18)).toFixed(3)} ${nativeBalance.symbol}` : ""}
+                {nativeBalance
+                  ? `${Number(formatUnits(nativeBalance.value, 18)).toFixed(3)} ${nativeBalance.symbol}`
+                  : ""}
               </div>
             </CardContent>
           </Card>
@@ -197,12 +158,14 @@ export default function Portfolio() {
           <Card className="glass-card border-border/60">
             <CardHeader className="pb-1">
               <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <Package className="h-4 w-4" /> DSTOCK position
+                <Package className="h-4 w-4" /> Deposited value
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="font-mono text-2xl font-semibold tabular-nums">{fmtShares(dstockBalance)}</div>
-              <div className="text-xs text-muted-foreground">soulbound equity tokens</div>
+              <div className="font-mono text-2xl font-semibold tabular-nums">{fmtReceiptValue(dstockBalance)}</div>
+              <div className="text-xs text-muted-foreground">
+                {fmtReceiptUnits(dstockBalance)} DSTOCK units · $0.01 each
+              </div>
             </CardContent>
           </Card>
 
@@ -219,12 +182,13 @@ export default function Portfolio() {
           </Card>
         </div>
 
-        {/* Holdings */}
         <Card className="glass-card border-border/60">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-heading">Your equity positions</CardTitle>
+            <CardTitle className="text-lg font-heading">Private equity positions</CardTitle>
           </CardHeader>
-          <CardContent>{address && <HoldingsTable address={address} />}</CardContent>
+          <CardContent>
+            <PrivateHoldings address={address} />
+          </CardContent>
         </Card>
       </div>
     </main>

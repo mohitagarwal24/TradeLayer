@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useAccount, useChainId } from "wagmi";
-import { formatUnits } from "viem";
+import { useAccount, useChainId, useSignMessage } from "wagmi";
+import { formatUnits, getAddress } from "viem";
 import { toast } from "sonner";
 import { ArrowDownUp, ShieldCheck, TrendingUp, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,16 +13,27 @@ import { useScaffoldReadContract } from "~~/hooks/scaffold-eth/useScaffoldReadCo
 import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth/useScaffoldWriteContract";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
-import { fmtShares, fmtUsdc, parseUsdc } from "@/lib/format";
+import {
+  fmtReceiptUnits,
+  fmtReceiptValue,
+  fmtUsdc,
+  MIN_BUY_USDC,
+  parseReceiptUnits,
+  parseUsdc,
+} from "@/lib/format";
 import { sealOrder } from "@/lib/sealOrder";
-import { HERMES_URL, PYTH_IDS, STOCKS, type StockSymbol } from "@/lib/pythFeeds";
+import { STOCKS, type StockSymbol } from "@/lib/pythFeeds";
 
-// Backend key-exchange API (order privacy). Set in .env for production.
 const BACKEND_API = import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000";
 
 type LivePrice = { price: number };
+type PrivatePosition = {
+  symbol: string;
+  shares: number;
+  receiptUnits: number;
+  depositedUsdc: number;
+};
 
-/** Fetches fresh prices from Pyth's Hermes API so the UI shows market truth even before settlement. */
 function useLivePrices() {
   const [prices, setPrices] = useState<Partial<Record<StockSymbol, LivePrice>>>({});
 
@@ -31,27 +42,20 @@ function useLivePrices() {
 
     const fetchOnce = async () => {
       try {
-        const ids = Object.values(PYTH_IDS).join("&ids[]=");
-        const res = await fetch(`${HERMES_URL}/v2/updates/price/latest?${ids}`);
-        const json = await res.json();
+        const res = await fetch(`${BACKEND_API}/prices`);
+        if (!res.ok) throw new Error(`backend price request failed: ${res.status}`);
+        const json = (await res.json()) as {
+          prices?: Partial<Record<StockSymbol, LivePrice>>;
+        };
         if (cancelled) return;
-
-        const next: Partial<Record<StockSymbol, LivePrice>> = {};
-        for (const parsed of json.parsed ?? []) {
-          const symbol = (Object.keys(PYTH_IDS) as StockSymbol[]).find(
-            (s) => PYTH_IDS[s].toLowerCase() === `0x${parsed.id}`.toLowerCase(),
-          );
-          if (!symbol) continue;
-          next[symbol] = { price: Number(parsed.price.price) * 10 ** parsed.price.expo };
-        }
-        setPrices(next);
+        setPrices(json.prices ?? {});
       } catch {
-        // Hermes unreachable (offline dev) — fall back to on-chain values.
+        // Backend unreachable — fall back to on-chain values.
       }
     };
 
     fetchOnce();
-    const interval = setInterval(fetchOnce, 10_000);
+    const interval = setInterval(fetchOnce, 30_000);
     return () => {
       cancelled = true;
       clearInterval(interval);
@@ -68,13 +72,13 @@ export function TradingPanel() {
   const chainId = useChainId();
   const { targetNetwork } = useTargetNetwork();
   const writeTx = useTransactor();
+  const { signMessageAsync } = useSignMessage();
 
   const [mode, setMode] = useState<"buy" | "redeem">("buy");
-  const [symbol, setSymbol] = useState<StockSymbol>("AAPL");
+  const [symbol, setSymbol] = useState<StockSymbol>("TSLA");
   const [usdcAmount, setUsdcAmount] = useState("");
-  const [shareAmount, setShareAmount] = useState("");
-
-  // --- contract reads -------------------------------------------------------
+  const [redeemUnitsInput, setRedeemUnitsInput] = useState("");
+  const [privatePosition, setPrivatePosition] = useState<PrivatePosition | null>(null);
 
   const { data: deployed } = useDeployedContractInfo({ contractName: "TradeLayer" });
   const tradeLayerAddress = deployed?.address;
@@ -85,8 +89,6 @@ export function TradingPanel() {
     args: [symbol],
   });
 
-  // Real USDC on Hedera testnet comes via externalContracts under the same
-  // display name; on local chains it resolves to the deployed MockUSDC.
   const { data: usdcBalance } = useScaffoldReadContract({
     contractName: "MockUSDC",
     functionName: "balanceOf",
@@ -115,17 +117,47 @@ export function TradingPanel() {
     watch: true,
   });
 
-  // --- writes ---------------------------------------------------------------
-
   const { writeContractAsync: writeUsdc } = useScaffoldWriteContract({ contractName: "MockUSDC" });
   const { writeContractAsync: writeTradeLayer } = useScaffoldWriteContract({ contractName: "TradeLayer" });
 
   const livePrices = useLivePrices();
 
   const amountWei = useMemo(() => parseUsdc(usdcAmount || "0"), [usdcAmount]);
+  const redeemUnits = useMemo(() => parseReceiptUnits(redeemUnitsInput), [redeemUnitsInput]);
 
   const needsApproval =
     mode === "buy" && !!tradeLayerAddress && usdcAllowance !== undefined && usdcAllowance < amountWei && amountWei > 0n;
+
+  useEffect(() => {
+    setPrivatePosition(null);
+  }, [symbol, address]);
+
+  async function loadPrivatePosition() {
+    if (!address) return;
+    try {
+      const normalized = getAddress(address);
+      const timestamp = Date.now().toString();
+      const message = `TradeLayer private portfolio\nAddress: ${normalized}\nTimestamp: ${timestamp}`;
+      const signature = await signMessageAsync({ account: normalized, message });
+      const response = await fetch(`${BACKEND_API}/private-portfolio/${normalized}`, {
+        headers: {
+          "X-PORTFOLIO-TIMESTAMP": timestamp,
+          "X-PORTFOLIO-SIGNATURE": signature,
+        },
+      });
+      if (!response.ok) throw new Error((await response.json()).error ?? `backend ${response.status}`);
+      const body = (await response.json()) as { positions: PrivatePosition[] };
+      const match = body.positions.find(p => p.symbol === symbol) ?? null;
+      setPrivatePosition(match);
+      if (match) {
+        toast.success(`${symbol}: ${match.receiptUnits} units deposited (${fmtReceiptValue(match.receiptUnits)})`);
+      } else {
+        toast.message(`No private ${symbol} position`);
+      }
+    } catch (error) {
+      toast.error("Could not load private position", { description: (error as Error).message });
+    }
+  }
 
   async function handleApprove() {
     if (!tradeLayerAddress) return;
@@ -137,18 +169,24 @@ export function TradingPanel() {
     }
   }
 
-  /** Seal intent E2E and register the ephemeral pubkey with the backend. */
   async function buildEncryptedOrder(orderId: string, side: "buy" | "sell"): Promise<`0x${string}` | null> {
     try {
       const pubRes = await fetch(`${BACKEND_API}/public-key`);
       if (!pubRes.ok) throw new Error(`backend /public-key ${pubRes.status}`);
       const { publicKey } = (await pubRes.json()) as { publicKey: string };
 
-      const qty = side === "sell" ? Number(shareAmount || "0") : Math.round(Number(usdcAmount || "0"));
-      const sealed = await sealOrder(
-        { stock: symbol, qty, side, orderType: "market" },
-        publicKey,
-      );
+      if (side === "buy") {
+        if (amountWei < 1_000_000n) {
+          toast.error("Minimum buy is $1.00 USDC");
+          return null;
+        }
+      } else if (redeemUnits <= 0n) {
+        toast.error("Enter deposited value to redeem (e.g. 2.50 for $2.50)");
+        return null;
+      }
+
+      const qty = side === "sell" ? Number(redeemUnits) : 0;
+      const sealed = await sealOrder({ stock: symbol, qty, side, orderType: "market" }, publicKey);
 
       await fetch(`${BACKEND_API}/ephemeral-key`, {
         method: "POST",
@@ -168,6 +206,10 @@ export function TradingPanel() {
 
   async function handleBuy() {
     if (!address) return;
+    if (amountWei < 1_000_000n) {
+      toast.error("Minimum buy is $1.00 USDC (whole cents only)");
+      return;
+    }
     const orderId = crypto.randomUUID();
     const encryptedOrder = await buildEncryptedOrder(orderId, "buy");
     if (!encryptedOrder) return;
@@ -180,7 +222,7 @@ export function TradingPanel() {
       );
       setUsdcAmount("");
       toast.success(`Buy order placed (${orderId.slice(0, 8)})`, {
-        description: "Escrowed on-chain, encrypted end-to-end. The backend will settle it.",
+        description: `Escrowed $${usdcAmount} — Alpaca will fill a $${Number(usdcAmount).toFixed(2)} notional order.`,
       });
     } catch {
       /* surfaced by transactor */
@@ -188,7 +230,7 @@ export function TradingPanel() {
   }
 
   async function handleRedeem() {
-    if (!address || !shareAmount) return;
+    if (!address || redeemUnits <= 0n) return;
     const orderId = crypto.randomUUID();
     const encryptedOrder = await buildEncryptedOrder(orderId, "sell");
     if (!encryptedOrder) return;
@@ -196,19 +238,17 @@ export function TradingPanel() {
       await writeTx(async () =>
         writeTradeLayer({
           functionName: "redeemStock",
-          args: [orderId, encryptedOrder, BigInt(Math.round(Number(shareAmount)))],
+          args: [orderId, encryptedOrder, redeemUnits],
         }),
       );
-      setShareAmount("");
+      setRedeemUnitsInput("");
       toast.success(`Redeem request placed (${orderId.slice(0, 8)})`, {
-        description: "Locked on-chain, encrypted end-to-end. The backend will settle it.",
+        description: "Locked receipt units on-chain. Backend sells proportional private shares.",
       });
     } catch {
       /* surfaced by transactor */
     }
   }
-
-  // --- derived --------------------------------------------------------------
 
   const onChainPrice = price18 !== undefined ? Number(formatUnits(price18, 18)) : undefined;
   const displayPrice = livePrices[symbol]?.price ?? onChainPrice;
@@ -221,16 +261,21 @@ export function TradingPanel() {
   const unlockedDstock =
     dstockBalance !== undefined && lockedForRedeem !== undefined ? dstockBalance - lockedForRedeem : undefined;
 
-  const wrongChainOrDisconnected = !isConnected || chainId !== targetNetwork.id;
+  const maxRedeemForSymbol =
+    privatePosition !== undefined && privatePosition !== null
+      ? Math.min(Number(unlockedDstock ?? 0n), privatePosition.receiptUnits)
+      : unlockedDstock !== undefined
+        ? Number(unlockedDstock)
+        : undefined;
 
-  // --------------------------------------------------------------------------
+  const wrongChainOrDisconnected = !isConnected || chainId !== targetNetwork.id;
 
   return (
     <Card className="glass-card border-border/60">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-heading">Place order</CardTitle>
-          <Tabs value={mode} onValueChange={(v) => setMode(v as "buy" | "redeem")}>
+          <Tabs value={mode} onValueChange={v => setMode(v as "buy" | "redeem")}>
             <TabsList className="rounded-full bg-secondary/60">
               <TabsTrigger value="buy" className="rounded-full px-5">
                 Buy
@@ -244,9 +289,8 @@ export function TradingPanel() {
       </CardHeader>
 
       <CardContent className="space-y-5">
-        {/* Stock selector */}
-        <div className="grid grid-cols-4 gap-2">
-          {STOCKS.map((s) => (
+        <div className="grid grid-cols-3 gap-2">
+          {STOCKS.map(s => (
             <button
               key={s}
               onClick={() => setSymbol(s)}
@@ -258,23 +302,27 @@ export function TradingPanel() {
             >
               <div className="text-sm font-semibold">{s}</div>
               <div className="text-[11px] text-muted-foreground tabular-nums">
-                {s === symbol && displayPrice ? `$${displayPrice.toFixed(2)}` : livePrices[s]?.price ? `$${livePrices[s]!.price.toFixed(2)}` : ""}
+                {s === symbol && displayPrice
+                  ? `$${displayPrice.toFixed(2)}`
+                  : livePrices[s]?.price
+                    ? `$${livePrices[s]!.price.toFixed(2)}`
+                    : ""}
               </div>
             </button>
           ))}
         </div>
 
-        {/* Amount input */}
         {mode === "buy" ? (
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">Amount (USDC)</label>
+            <label className="text-xs font-medium text-muted-foreground">Exact USDC spend (min ${MIN_BUY_USDC})</label>
             <div className="relative">
               <Input
                 type="number"
-                min="0"
-                placeholder="100.00"
+                min={MIN_BUY_USDC}
+                step="0.01"
+                placeholder="5.00"
                 value={usdcAmount}
-                onChange={(e) => setUsdcAmount(e.target.value)}
+                onChange={e => setUsdcAmount(e.target.value)}
                 className="h-14 rounded-xl pr-20 text-lg"
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
@@ -287,26 +335,43 @@ export function TradingPanel() {
               </span>
               {estimatedShares !== undefined && (
                 <span className="flex items-center gap-1 text-success">
-                  ≈ {estimatedShares.toFixed(0)} {symbol}
+                  ≈ {estimatedShares.toFixed(6)} {symbol}
                   <TrendingUp className="h-3 w-3" />
                 </span>
               )}
             </div>
+            {usdcAmount && amountWei === 0n && (
+              <p className="text-xs text-destructive">Enter a whole-cent amount (e.g. 5.00), at least $1.00.</p>
+            )}
           </div>
         ) : (
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">Shares to redeem</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground">
+                Deposited value to redeem ({symbol})
+              </label>
+              <button
+                type="button"
+                onClick={loadPrivatePosition}
+                className="text-[11px] text-primary hover:underline"
+              >
+                Sign to load {symbol} units
+              </button>
+            </div>
             <div className="relative">
               <Input
                 type="number"
-                min="1"
-                placeholder="0"
-                value={shareAmount}
-                onChange={(e) => setShareAmount(e.target.value)}
+                min="0.01"
+                step="0.01"
+                placeholder="2.50"
+                value={redeemUnitsInput}
+                onChange={e => setRedeemUnitsInput(e.target.value)}
                 className="h-14 rounded-xl pr-24 text-lg"
               />
               <button
-                onClick={() => unlockedDstock !== undefined && setShareAmount(String(unlockedDstock))}
+                onClick={() =>
+                  maxRedeemForSymbol !== undefined && setRedeemUnitsInput((maxRedeemForSymbol / 100).toFixed(2))
+                }
                 className="absolute right-4 top-1/2 -translate-y-1/2 rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80"
               >
                 MAX
@@ -314,24 +379,30 @@ export function TradingPanel() {
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
               <span>
-                Unlocked DSTOCK: <span className="tabular-nums">{fmtShares(unlockedDstock)}</span>
+                Aggregate deposited: <span className="tabular-nums">{fmtReceiptValue(unlockedDstock)}</span>
+                {unlockedDstock !== undefined && (
+                  <span className="ml-1">({fmtReceiptUnits(unlockedDstock)} units)</span>
+                )}
               </span>
+              {privatePosition && (
+                <span>
+                  {symbol}: {privatePosition.receiptUnits} units · {privatePosition.shares.toFixed(6)} sh
+                </span>
+              )}
               {(lockedForRedeem ?? 0n) > 0n && (
                 <Badge variant="outline" className="border-warning/40 text-warning">
-                  {fmtShares(lockedForRedeem)} locked pending settlement
+                  {fmtReceiptValue(lockedForRedeem)} locked
                 </Badge>
               )}
             </div>
           </div>
         )}
 
-        {/* Price line */}
         <div className="flex items-center justify-between rounded-xl bg-secondary/40 px-4 py-3 text-sm">
           <span className="text-muted-foreground">{symbol} reference price</span>
           <span className="font-mono tabular-nums">{displayPrice ? `$${displayPrice.toFixed(2)}` : "—"}</span>
         </div>
 
-        {/* Actions */}
         {wrongChainOrDisconnected ? (
           <Button disabled className="h-12 w-full rounded-xl text-base">
             <Wallet className="mr-2 h-4 w-4" /> Connect wallet on {targetNetwork.name}
@@ -343,25 +414,25 @@ export function TradingPanel() {
         ) : mode === "buy" ? (
           <Button
             onClick={handleBuy}
-            disabled={!usdcAmount || Number(usdcAmount) <= 0}
+            disabled={!usdcAmount || amountWei < 1_000_000n}
             className="h-12 w-full rounded-xl text-base font-semibold gap-2"
           >
-            <ArrowDownUp className="h-4 w-4" /> Buy {symbol}
+            <ArrowDownUp className="h-4 w-4" /> Buy ${usdcAmount || "0"} of {symbol}
           </Button>
         ) : (
           <Button
             onClick={handleRedeem}
-            disabled={!shareAmount || BigInt(Math.round(Number(shareAmount || "0"))) <= 0n}
+            disabled={!redeemUnitsInput || redeemUnits <= 0n}
             className="h-12 w-full rounded-xl text-base font-semibold gap-2"
           >
-            <ArrowDownUp className="h-4 w-4" /> Redeem {symbol}
+            <ArrowDownUp className="h-4 w-4" /> Redeem {fmtReceiptValue(redeemUnits)} {symbol}
           </Button>
         )}
 
         <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
           <ShieldCheck className="mr-1 inline h-3 w-3" />
-          Orders are encrypted end-to-end (ECDH + AES-GCM), escrowed on-chain, and settled by the backend against the
-          Pyth oracle price.
+          Exact USDC notional buys mint 1 DSTOCK unit per $0.01 deposited. Redemptions burn those units and sell
+          proportional private fractional shares; payout follows the actual fill.
         </p>
       </CardContent>
     </Card>

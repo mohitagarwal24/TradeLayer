@@ -34,12 +34,12 @@ const scaffoldConfig = {
   pollingInterval: 4000,
   // This is our Alchemy's default API key.
   // You can get your own at https://dashboard.alchemyapi.io
-  alchemyApiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || DEFAULT_ALCHEMY_API_KEY,
+  alchemyApiKey: import.meta.env?.VITE_ALCHEMY_API_KEY || DEFAULT_ALCHEMY_API_KEY,
   // If you want to use a different RPC for a specific network, you can add it here.
   // The key is the chain ID, and the value is the HTTP RPC URL
   rpcOverrides: {},
   // This is our WalletConnect's default project ID.
-  walletConnectProjectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || "3a8170812b534d0ff9d794f19a901d64",
+  walletConnectProjectId: import.meta.env?.VITE_WALLET_CONNECT_PROJECT_ID || "3a8170812b534d0ff9d794f19a901d64",
   onlyLocalBurnerWallet: true,
 } as const satisfies ScaffoldConfig;
 

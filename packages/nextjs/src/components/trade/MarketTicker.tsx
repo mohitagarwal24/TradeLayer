@@ -2,27 +2,34 @@ import { useScaffoldReadContract } from "~~/hooks/scaffold-eth/useScaffoldReadCo
 import { formatUnits } from "viem";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { STOCK_META } from "@/lib/format";
-
-const STOCKS = ["AAPL", "GOOGL", "TSLA", "MSFT"] as const;
+import { STOCKS } from "@/lib/pythFeeds";
 
 export function MarketTicker() {
-  const { data: aapl } = useScaffoldReadContract({ contractName: "TradeLayer", functionName: "getStockPriceUnsafe", args: ["AAPL"] });
-  const { data: googl } = useScaffoldReadContract({ contractName: "TradeLayer", functionName: "getStockPriceUnsafe", args: ["GOOGL"] });
-  const { data: tsla } = useScaffoldReadContract({ contractName: "TradeLayer", functionName: "getStockPriceUnsafe", args: ["TSLA"] });
-  const { data: msft } = useScaffoldReadContract({ contractName: "TradeLayer", functionName: "getStockPriceUnsafe", args: ["MSFT"] });
+  const { data: tsla } = useScaffoldReadContract({
+    contractName: "TradeLayer",
+    functionName: "getStockPriceUnsafe",
+    args: ["TSLA"],
+  });
+  const { data: voo } = useScaffoldReadContract({
+    contractName: "TradeLayer",
+    functionName: "getStockPriceUnsafe",
+    args: ["VOO"],
+  });
+  const { data: qqq } = useScaffoldReadContract({
+    contractName: "TradeLayer",
+    functionName: "getStockPriceUnsafe",
+    args: ["QQQ"],
+  });
 
-  const prices: Record<string, bigint | undefined> = { AAPL: aapl, GOOGL: googl, TSLA: tsla, MSFT: msft };
+  const prices: Record<string, bigint | undefined> = { TSLA: tsla, VOO: voo, QQQ: qqq };
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-2">
-      {STOCKS.map((s) => {
+      {STOCKS.map(s => {
         const p = prices[s];
         const value = p !== undefined ? Number(formatUnits(p, 18)) : undefined;
         return (
-          <div
-            key={s}
-            className="glass-card flex items-center gap-2 rounded-full px-4 py-1.5 text-sm"
-          >
+          <div key={s} className="glass-card flex items-center gap-2 rounded-full px-4 py-1.5 text-sm">
             <span className="h-2 w-2 rounded-full" style={{ backgroundColor: STOCK_META[s]?.color }} />
             <span className="font-medium">{s}</span>
             <span className="font-mono tabular-nums text-muted-foreground">
