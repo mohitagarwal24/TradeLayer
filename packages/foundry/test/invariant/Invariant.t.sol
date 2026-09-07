@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-import {TradeLayer} from "../../contracts/TradeLayer.sol";
-import {MockUSDC} from "../../contracts/mocks/MockUSDC.sol";
-import {MockAtsSecurityToken} from "../../contracts/mocks/MockAtsSecurityToken.sol";
-import {Handler} from "./Handler.t.sol";
+import { Test } from "forge-std/Test.sol";
+import { TradeLayer } from "../../contracts/TradeLayer.sol";
+import { MockUSDC } from "../../contracts/mocks/MockUSDC.sol";
+import { MockAtsSecurityToken } from "../../contracts/mocks/MockAtsSecurityToken.sol";
+import { Handler } from "./Handler.t.sol";
 
 contract TradeLayerInvariantTest is Test {
     TradeLayer public tradeLayer;
@@ -37,7 +37,7 @@ contract TradeLayerInvariantTest is Test {
         selectors[2] = Handler.redeemStock.selector;
         selectors[3] = Handler.fulfillRedeemRequest.selector;
 
-        targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
+        targetSelector(FuzzSelector({ addr: address(handler), selectors: selectors }));
     }
 
     /* ---------- INVARIANT 1: USDC CONSERVATION ---------- */
@@ -60,47 +60,41 @@ contract TradeLayerInvariantTest is Test {
         assertEq(totalSupply, sumOfHoldings, "INVARIANT VIOLATED: Total Supply != Sum of Holdings");
     }
 
-    /* ---------- INVARIANT 3: SETTLEMENT IS BOUND TO INTENT ---------- */
+    /* ---------- INVARIANT 3: AGGREGATE TOKEN MATCHES PRIVATE LEDGER ---------- */
 
-    /// @notice The contract's recorded per-user, per-stock holdings must equal the
-    /// intended holdings the handler tracked from the stock/quantity each request
-    /// actually committed to. If a settlement could be attributed to the wrong
-    /// stock, user, or quantity, this diverges. (The original invariant #3 was a
-    /// no-op `assertTrue(true)` and could not catch this class of bug at all.)
+    /// @notice Per-stock positions remain in the private backend ledger. Their
+    /// aggregate must equal the user's public DSTOCK balance.
     function invariant_settlementMatchesIntent() public view {
         address[] memory actors = handler.getActors();
         string[] memory stocks = handler.getStocks();
 
         for (uint256 i = 0; i < actors.length; i++) {
+            uint256 privateAggregate;
             for (uint256 j = 0; j < stocks.length; j++) {
-                assertEq(
-                    tradeLayer.totalHoldings(actors[i], stocks[j]),
-                    handler.ghost_holdings(actors[i], stocks[j]),
-                    "INVARIANT VIOLATED: on-chain holdings != intended holdings"
-                );
+                privateAggregate += handler.ghost_holdings(actors[i], stocks[j]);
             }
+            assertEq(
+                tradeLayer.balanceOf(actors[i]),
+                privateAggregate,
+                "INVARIANT VIOLATED: DSTOCK != private holdings aggregate"
+            );
         }
     }
 
-    /* ---------- INVARIANT 4: USER BALANCE >= USER HOLDINGS ---------- */
+    /* ---------- INVARIANT 4: REDEMPTION LOCKS ARE COVERED ---------- */
 
-    /// @notice Each user's token balance must be >= their total stock holdings
+    /// @notice A user can never lock more DSTOCK than their aggregate balance.
     function invariant_userBalanceCoversHoldings() public view {
         address[] memory actors = _getActors();
-        string[] memory stocks = _getStocks();
 
         for (uint256 i = 0; i < actors.length; i++) {
             uint256 balance = tradeLayer.balanceOf(actors[i]);
-            uint256 totalHoldings = 0;
-
-            for (uint256 j = 0; j < stocks.length; j++) {
-                totalHoldings += tradeLayer.totalHoldings(actors[i], stocks[j]);
-            }
-
             assertGe(
                 balance,
-                totalHoldings,
-                string(abi.encodePacked("INVARIANT VIOLATED: User balance < holdings for ", vm.toString(actors[i])))
+                tradeLayer.lockedForRedeem(actors[i]),
+                string(
+                    abi.encodePacked("INVARIANT VIOLATED: User balance < locked amount for ", vm.toString(actors[i]))
+                )
             );
         }
     }

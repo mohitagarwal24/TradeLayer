@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-import {TradeLayer} from "../../contracts/TradeLayer.sol";
-import {MockUSDC} from "../../contracts/mocks/MockUSDC.sol";
-import {MockAtsSecurityToken} from "../../contracts/mocks/MockAtsSecurityToken.sol";
-import {console} from "forge-std/console.sol";
+import { Test } from "forge-std/Test.sol";
+import { TradeLayer } from "../../contracts/TradeLayer.sol";
+import { MockUSDC } from "../../contracts/mocks/MockUSDC.sol";
+import { MockAtsSecurityToken } from "../../contracts/mocks/MockAtsSecurityToken.sol";
+import { console } from "forge-std/console.sol";
 
 /// @dev Handler for stateful invariant fuzzing.
 ///
@@ -74,18 +74,19 @@ contract Handler is Test {
             usdc.approve(address(tradeLayer), type(uint256).max);
         }
 
-        stockSymbols.push("AAPL");
-        stockSymbols.push("GOOGL");
         stockSymbols.push("TSLA");
-        stockSymbols.push("MSFT");
-        stockSymbols.push("AMZN");
+        stockSymbols.push("VOO");
+        stockSymbols.push("QQQ");
     }
 
     /* ---------- HANDLER FUNCTIONS ---------- */
 
     function buyStock(uint256 actorSeed, uint256 usdcAmount) external countCall("buyStock") {
         address actor = actors[bound(actorSeed, 0, actors.length - 1)];
-        usdcAmount = bound(usdcAmount, 1e6, 10_000e6); // 1 to 10k USDC
+        // Whole cents only, at least $1 (Alpaca notional floor).
+        usdcAmount = bound(usdcAmount, 1e6, 10_000e6);
+        usdcAmount = (usdcAmount / 10_000) * 10_000;
+        if (usdcAmount < 1e6) usdcAmount = 1e6;
 
         uint256 balance = usdc.balanceOf(actor);
         if (balance < usdcAmount) {
@@ -106,7 +107,7 @@ contract Handler is Test {
         tradeLayer.buyStock(orderId, encryptedOrder, usdcAmount);
     }
 
-    function fulfillBuyRequest(uint256 orderSeed, uint256 stockSeed, uint256 quantity, uint256 refundSeed)
+    function fulfillBuyRequest(uint256 orderSeed, uint256 stockSeed, uint256 refundSeed)
         external
         countCall("fulfillBuy")
     {
@@ -119,20 +120,25 @@ contract Handler is Test {
         (address user, uint256 usdcBalance,,) = tradeLayer.requests(orderId);
 
         string memory stockName = stockSymbols[bound(stockSeed, 0, stockSymbols.length - 1)];
-        quantity = bound(quantity, 1, 1000);
 
-        // A partial fill returns unspent USDC; it can never exceed the escrow.
-        uint256 refund = bound(refundSeed, 0, usdcBalance);
+        // Refund whole cents; leave at least $1 net spend so mint is valid.
+        uint256 maxRefund = usdcBalance > 1e6 ? usdcBalance - 1e6 : 0;
+        uint256 refund = bound(refundSeed, 0, maxRefund);
+        refund = (refund / 10_000) * 10_000;
+        uint256 units = (usdcBalance - refund) / 10_000;
 
-        TradeLayer.Result memory result =
-            TradeLayer.Result({orderId: orderId, stockName: stockName, stockQuantity: quantity, amountToRefund: refund});
+        TradeLayer.Result memory result = TradeLayer.Result({
+            dstockUnits: units,
+            amountToRefund: refund,
+            executionCommitment: keccak256(abi.encode(orderId, stockName, units, refund))
+        });
 
         // Handler is the backend wallet (set in the test setUp).
         tradeLayer.fulfillRequest(orderId, abi.encode(result));
 
         // State changed successfully — update ghosts to match intent.
-        ghost_holdings[user][stockName] += quantity;
-        ghost_totalTokensMinted += quantity;
+        ghost_holdings[user][stockName] += units;
+        ghost_totalTokensMinted += units;
         ghost_totalUsdcWithdrawn += refund;
         ghost_pendingBuyOrders[orderId] = false;
         ghost_ordersProcessed++;
@@ -190,10 +196,9 @@ contract Handler is Test {
         usdcToReturn = bound(usdcToReturn, 0, free);
 
         TradeLayer.Result memory result = TradeLayer.Result({
-            orderId: orderId,
-            stockName: stockName,
-            stockQuantity: quantity,
-            amountToRefund: usdcToReturn
+            dstockUnits: quantity,
+            amountToRefund: usdcToReturn,
+            executionCommitment: keccak256(bytes(orderId))
         });
 
         tradeLayer.fulfillRequest(orderId, abi.encode(result));
@@ -235,13 +240,12 @@ contract Handler is Test {
         return total;
     }
 
-    // Sum of all user holdings as recorded on-chain (for invariant #2)
+    // Only aggregate DSTOCK balances are public; per-stock ghosts model the
+    // backend's private ledger and must sum to the same aggregate.
     function getSumOfAllHoldings() external view returns (uint256) {
         uint256 sum = 0;
         for (uint256 i = 0; i < actors.length; i++) {
-            for (uint256 j = 0; j < stockSymbols.length; j++) {
-                sum += tradeLayer.totalHoldings(actors[i], stockSymbols[j]);
-            }
+            sum += tradeLayer.balanceOf(actors[i]);
         }
         return sum;
     }
