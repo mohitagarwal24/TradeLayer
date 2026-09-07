@@ -23,6 +23,13 @@ type PaymentRequirements = {
   asset: string;
   extra: { feePayer: string };
 };
+type ResourceInfo = {
+  url: string;
+  description: string;
+  mimeType: string;
+  serviceName: string;
+};
+type ResourcePreflight = (req: Request) => Promise<string | null>;
 
 let cachedFeePayer: string | null = null;
 
@@ -63,26 +70,36 @@ function decodePaymentHeader(header: string | undefined): unknown | null {
   }
 }
 
+function encodeHeader(value: unknown) {
+  return Buffer.from(JSON.stringify(value)).toString("base64");
+}
+
 async function verifyAndSettle(paymentPayload: unknown, paymentRequirements: PaymentRequirements) {
   const body = JSON.stringify({ x402Version: 2, paymentPayload, paymentRequirements });
-  const verify = await fetch(`${FACILITATOR}/verify`, {
+  const verifyResponse = await fetch(`${FACILITATOR}/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body,
-  }).then((r) => r.json() as Promise<{ isValid?: boolean; invalidMessage?: string; payer?: string }>);
+  });
+  if (!verifyResponse.ok) throw new Error(`facilitator /verify ${verifyResponse.status}`);
+  const verify = (await verifyResponse.json()) as { isValid?: boolean; invalidMessage?: string; payer?: string };
 
   if (!verify.isValid) {
     throw new Error(verify.invalidMessage ?? "payment verification failed");
   }
 
-  const settle = await fetch(`${FACILITATOR}/settle`, {
+  const settleResponse = await fetch(`${FACILITATOR}/settle`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body,
-  }).then(
-    (r) =>
-      r.json() as Promise<{ success?: boolean; transaction?: string; errorMessage?: string; network?: string }>,
-  );
+  });
+  if (!settleResponse.ok) throw new Error(`facilitator /settle ${settleResponse.status}`);
+  const settle = (await settleResponse.json()) as {
+    success?: boolean;
+    transaction?: string;
+    errorMessage?: string;
+    network?: string;
+  };
 
   if (!settle.success) {
     throw new Error(settle.errorMessage ?? "payment settlement failed");
@@ -93,10 +110,10 @@ async function verifyAndSettle(paymentPayload: unknown, paymentRequirements: Pay
 /** Append a payment receipt to an HCS topic when configured (extra prize points). */
 async function appendHcsAudit(record: Record<string, unknown>) {
   const topicId = process.env.HCS_AUDIT_TOPIC;
-  const accountId = process.env.HEDERA_ACCOUNT_ID;
-  const privateKey = process.env.HEDERA_PRIVATE_KEY;
+  const accountId = process.env.HCS_OPERATOR_ACCOUNT_ID ?? process.env.HEDERA_ACCOUNT_ID;
+  const privateKey = process.env.HCS_OPERATOR_PRIVATE_KEY ?? process.env.HEDERA_PRIVATE_KEY;
   if (!topicId || !accountId || !privateKey) {
-    console.log("HCS audit skipped (set HCS_AUDIT_TOPIC + HEDERA_ACCOUNT_ID + HEDERA_PRIVATE_KEY)");
+    console.log("HCS audit skipped (set HCS_AUDIT_TOPIC + HCS_OPERATOR_ACCOUNT_ID + HCS_OPERATOR_PRIVATE_KEY)");
     return;
   }
 
@@ -117,25 +134,39 @@ async function appendHcsAudit(record: Record<string, unknown>) {
  * Express middleware: requires a settled x402 payment (Blocky402) before
  * handing the request to the route handler.
  */
-export function requireX402Payment(description: string) {
+export function requireX402Payment(description: string, preflight: ResourcePreflight) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const unavailable = await preflight(req);
+      if (unavailable) {
+        res.status(unavailable === "order not found" ? 404 : 400).json({ error: unavailable });
+        return;
+      }
+
       const requirements = await buildRequirements();
-      const paymentPayload = decodePaymentHeader(req.header("X-PAYMENT") ?? undefined);
+      const paymentPayload = decodePaymentHeader(req.header("PAYMENT-SIGNATURE") ?? undefined);
 
       if (!paymentPayload) {
-        res.status(402).json({
+        const resource: ResourceInfo = {
+          url: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+          description,
+          mimeType: "application/json",
+          serviceName: "TradeLayer",
+        };
+        const paymentRequired = {
           x402Version: 2,
           error: "Payment Required",
           accepts: [requirements],
-          description,
-          resource: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
-        });
+          resource,
+        };
+        res.setHeader("PAYMENT-REQUIRED", encodeHeader(paymentRequired));
+        res.status(402).json(paymentRequired);
         return;
       }
 
       const settlement = await verifyAndSettle(paymentPayload, requirements);
       (req as Request & { x402Settlement?: unknown }).x402Settlement = settlement;
+      res.setHeader("PAYMENT-RESPONSE", encodeHeader(settlement));
 
       await appendHcsAudit({
         path: req.originalUrl,

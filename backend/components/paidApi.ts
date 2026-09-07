@@ -9,23 +9,19 @@ export async function orderStatusHandler(req: Request, res: Response) {
     return;
   }
 
-  const reqOnChain = await contract.requests(orderId);
-  const processed = await contract.orderProcessed(orderId);
-  const used = await contract.orderIdUsed(orderId);
+  const cached = (req as Request & { x402ResourceData?: Record<string, unknown> }).x402ResourceData;
+  if (!cached) {
+    res.status(500).json({ error: "resource was not validated before payment" });
+    return;
+  }
 
   res.json({
-    orderId,
-    requester: reqOnChain[0],
-    usdcBalance: reqOnChain[1].toString(),
-    tokenBalance: reqOnChain[2].toString(),
-    isRedeem: reqOnChain[3],
-    orderIdUsed: used,
-    orderProcessed: processed,
+    ...cached,
     settlement: (req as Request & { x402Settlement?: unknown }).x402Settlement ?? null,
   });
 }
 
-/** Paid portfolio snapshot for an address. */
+/** Paid public portfolio snapshot. Per-stock allocations are intentionally absent. */
 export async function portfolioHandler(req: Request, res: Response) {
   const address = req.params.address;
   if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
@@ -33,21 +29,45 @@ export async function portfolioHandler(req: Request, res: Response) {
     return;
   }
 
-  const holdings: string[] = await contract.getStockHoldings(address);
-  const dstock = await contract.balanceOf(address);
-  const locked = await contract.lockedForRedeem(address);
-
-  const positions = [];
-  for (const symbol of holdings) {
-    const qty = await contract.totalHoldings(address, symbol);
-    positions.push({ symbol, quantity: qty.toString() });
+  const cached = (req as Request & { x402ResourceData?: Record<string, unknown> }).x402ResourceData;
+  if (!cached) {
+    res.status(500).json({ error: "resource was not validated before payment" });
+    return;
   }
 
   res.json({
+    ...cached,
+    privacy: "Per-stock positions are not stored on-chain",
+    settlement: (req as Request & { x402Settlement?: unknown }).x402Settlement ?? null,
+  });
+}
+
+export async function validateOrderStatusResource(req: Request) {
+  const orderId = req.params.orderId;
+  if (!orderId) return "orderId required";
+  const used = await contract.orderIdUsed(orderId);
+  if (!used) return "order not found";
+  const [reqOnChain, processed] = await Promise.all([contract.requests(orderId), contract.orderProcessed(orderId)]);
+  (req as Request & { x402ResourceData?: Record<string, unknown> }).x402ResourceData = {
+    orderId,
+    requester: reqOnChain[0],
+    usdcBalance: reqOnChain[1].toString(),
+    tokenBalance: reqOnChain[2].toString(),
+    isRedeem: reqOnChain[3],
+    orderIdUsed: used,
+    orderProcessed: processed,
+  };
+  return null;
+}
+
+export async function validatePortfolioResource(req: Request) {
+  const address = req.params.address;
+  if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) return "valid EVM address required";
+  const [dstock, locked] = await Promise.all([contract.balanceOf(address), contract.lockedForRedeem(address)]);
+  (req as Request & { x402ResourceData?: Record<string, unknown> }).x402ResourceData = {
     address,
     dstockBalance: dstock.toString(),
     lockedForRedeem: locked.toString(),
-    positions,
-    settlement: (req as Request & { x402Settlement?: unknown }).x402Settlement ?? null,
-  });
+  };
+  return null;
 }
