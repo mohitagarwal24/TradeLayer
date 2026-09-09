@@ -26,7 +26,7 @@ dist
 packages/nextjs/.env
 backend/.env
 backend/.data/
-
+packages/nextjs/.vite
 # local agent tool permissions
 .claude/
 
