@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proof-of-Fill — Arkiv Ideathon Pitch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ground:   #F5F7F7;
+    --surface:  #FFFFFF;
+    --surface-2:#EBF0EF;
+    --ink:      #13191C;
+    --ink-2:    #37454A;
+    --muted:    #5E6D6F;
+    --rule:     #DBE3E2;
+    --rule-firm:#B6C2C1;
+    --accent:   #0E6E5C;
+    --accent-ink:#0A4C41;
+    --accent-wash:#E3EFEC;
+    --seal:     #8A6416;
+    --seal-wash:#F4EEDD;
+    --warn:     #98590D;
+    --crit:     #9F332B;
+    --shadow:   0 1px 2px rgba(19,25,28,.05), 0 8px 24px -16px rgba(19,25,28,.18);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:   #0E1315;
+      --surface:  #161D1F;
+      --surface-2:#1C2427;
+      --ink:      #E7EDEC;
+      --ink-2:    #C0CCCA;
+      --muted:    #8D9E9C;
+      --rule:     #273133;
+      --rule-firm:#3C4A4C;
+      --accent:   #4FBCA4;
+      --accent-ink:#82D6C2;
+      --accent-wash:#122A26;
+      --seal:     #C9A24E;
+      --seal-wash:#282212;
+      --warn:     #D0994A;
+      --crit:     #D8756B;
+      --shadow:   0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.6);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:   #0E1315;
+    --surface:  #161D1F;
+    --surface-2:#1C2427;
+    --ink:      #E7EDEC;
+    --ink-2:    #C0CCCA;
+    --muted:    #8D9E9C;
+    --rule:     #273133;
+    --rule-firm:#3C4A4C;
+    --accent:   #4FBCA4;
+    --accent-ink:#82D6C2;
+    --accent-wash:#122A26;
+    --seal:     #C9A24E;
+    --seal-wash:#282212;
+    --warn:     #D0994A;
+    --crit:     #D8756B;
+    --shadow:   0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.6);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .doc { max-width: 1140px; margin: 0 auto; padding: 0 28px 96px; }
+
+  /* ---------- masthead ---------- */
+
+  .mast { padding: 64px 0 36px; border-bottom: 1px solid var(--rule); }
+
+  .kicker {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .69rem; font-weight: 500; letter-spacing: .15em;
+    text-transform: uppercase; color: var(--accent-ink);
+    margin: 0 0 20px;
+  }
+
+  h1 {
+    font-family: Newsreader, Georgia, serif;
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    font-weight: 500; line-height: 1.02; letter-spacing: -.022em;
+    text-wrap: balance; margin: 0 0 18px;
+  }
+
+  .standfirst {
+    font-family: Newsreader, Georgia, serif;
+    font-size: clamp(1.12rem, 2vw, 1.34rem);
+    line-height: 1.5; color: var(--ink-2);
+    max-width: 40ch; margin: 0;
+  }
+
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 0;
+    margin: 34px 0 0; padding: 0; list-style: none;
+    border: 1px solid var(--rule); border-radius: 3px;
+    background: var(--surface); overflow: hidden;
+  }
+  .meta li {
+    flex: 1 1 150px; padding: 13px 16px;
+    border-right: 1px solid var(--rule);
+  }
+  .meta li:last-child { border-right: 0; }
+  .meta dt {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .62rem; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 5px;
+  }
+  .meta dd {
+    margin: 0; font-size: .89rem; font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .meta dd.hot { color: var(--crit); }
+  .meta dd.good { color: var(--accent); }
+
+  /* ---------- field structure ---------- */
+
+  .field {
+    display: grid;
+    grid-template-columns: 178px minmax(0, 1fr);
+    gap: 36px;
+    padding: 44px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .field:last-of-type { border-bottom: 0; }
+
+  .rail { position: relative; }
+  .rail-inner { position: sticky; top: 24px; }
+
+  .rail-tag {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .66rem; font-weight: 500; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted);
+    display: block; margin-bottom: 8px;
+  }
+  .rail-label {
+    font-size: .87rem; font-weight: 600; line-height: 1.35;
+    color: var(--ink); display: block;
+  }
+  .rail-note {
+    font-size: .74rem; line-height: 1.45; color: var(--muted);
+    margin-top: 8px; display: block;
+  }
+
+  .body > :first-child { margin-top: 0; }
+  .body > :last-child { margin-bottom: 0; }
+
+  h2 {
+    font-family: Newsreader, Georgia, serif;
+    font-size: 1.62rem; font-weight: 500; line-height: 1.2;
+    letter-spacing: -.012em; text-wrap: balance;
+    margin: 0 0 16px;
+  }
+
+  h3 {
+    font-size: .93rem; font-weight: 600; line-height: 1.4;
+    letter-spacing: -.002em;
+    margin: 30px 0 9px;
+  }
+
+  p { margin: 0 0 15px; max-width: 68ch; }
+  p:last-child { margin-bottom: 0; }
+
+  .lede { font-size: 1.05rem; color: var(--ink-2); }
+
+  a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:hover { text-decoration-thickness: 2px; }
+
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .855em;
+    background: var(--surface-2);
+    padding: .1em .34em; border-radius: 2px;
+  }
+
+  strong { font-weight: 600; }
+
+  ul.plain { margin: 0 0 15px; padding-left: 20px; max-width: 68ch; }
+  ul.plain li { margin-bottom: 8px; }
+  ul.plain li:last-child { margin-bottom: 0; }
+
+  /* ---------- figure ---------- */
+
+  figure { margin: 26px 0 0; }
+  .figframe {
+    border: 1px solid var(--rule); border-radius: 3px;
+    background: var(--surface); padding: 20px 18px 14px;
+    overflow-x: auto;
+  }
+  figure svg { display: block; max-width: 100%; height: auto; margin: 0 auto; min-width: 620px; }
+  figcaption {
+    font-size: .8rem; line-height: 1.5; color: var(--muted);
+    margin-top: 12px; max-width: 74ch;
+  }
+
+  .d-box { fill: var(--surface); stroke: var(--rule-firm); stroke-width: 1; }
+  .d-box-accent { fill: var(--accent-wash); stroke: var(--accent); stroke-width: 1.25; }
+  .d-lane {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 9.5px; letter-spacing: .13em; fill: var(--muted);
+  }
+  .d-cap {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 8.5px; letter-spacing: .12em; fill: var(--muted);
+  }
+  .d-txt { font-family: "IBM Plex Sans", sans-serif; font-size: 11px; fill: var(--ink); }
+  .d-txt-b { font-family: "IBM Plex Sans", sans-serif; font-size: 11px; font-weight: 600; fill: var(--ink); }
+  .d-mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10px; fill: var(--ink-2); }
+  .d-edge-lbl { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 9px; fill: var(--muted); }
+  .d-line { stroke: var(--rule-firm); stroke-width: 1.25; fill: none; }
+  .d-line-dash { stroke: var(--crit); stroke-width: 1.25; fill: none; stroke-dasharray: 4 3; }
+  .d-line-accent { stroke: var(--accent); stroke-width: 1.5; fill: none; }
+  .d-head { fill: var(--rule-firm); }
+  .d-head-crit { fill: var(--crit); }
+  .d-head-accent { fill: var(--accent); }
+  .d-div { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 2 4; }
+  .d-accent-txt { font-family: "IBM Plex Sans", sans-serif; font-size: 11px; font-weight: 600; fill: var(--accent-ink); }
+  .d-crit-txt { font-family: "IBM Plex Sans", sans-serif; font-size: 11px; font-weight: 600; fill: var(--crit); }
+
+  /* ---------- tables ---------- */
+
+  .tablewrap { overflow-x: auto; margin: 0 0 18px; border: 1px solid var(--rule); border-radius: 3px; background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .82rem; min-width: 560px; }
+  th, td { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  thead th {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .62rem; letter-spacing: .11em; text-transform: uppercase;
+    color: var(--muted); font-weight: 500; background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.num { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.attr { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .78rem; line-height: 1.55; }
+
+  .chip {
+    display: inline-block;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .58rem; letter-spacing: .09em; text-transform: uppercase;
+    padding: 1px 5px; border-radius: 2px; border: 1px solid;
+    vertical-align: 1px;
+  }
+  .chip-int { color: var(--accent-ink); border-color: var(--accent); background: var(--accent-wash); }
+  .chip-str { color: var(--seal); border-color: var(--seal); background: var(--seal-wash); }
+
+  /* ---------- entity cards ---------- */
+
+  .entity {
+    border: 1px solid var(--rule); border-left: 3px solid var(--accent);
+    border-radius: 3px; background: var(--surface);
+    padding: 16px 18px; margin: 0 0 14px;
+  }
+  .entity-head {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px;
+    margin-bottom: 4px;
+  }
+  .entity-name {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .93rem; font-weight: 600; color: var(--ink);
+  }
+  .entity-life {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .68rem; letter-spacing: .06em; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    margin-left: auto;
+  }
+  .entity p { font-size: .88rem; margin-bottom: 10px; }
+  .entity dl { margin: 0; font-size: .8rem; }
+  .entity dt {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .61rem; letter-spacing: .11em; text-transform: uppercase;
+    color: var(--muted); margin: 9px 0 3px;
+  }
+  .entity dd {
+    margin: 0;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .78rem; line-height: 1.6; color: var(--ink-2);
+  }
+  .entity .why {
+    font-size: .82rem; color: var(--ink-2); margin: 12px 0 0;
+    padding-top: 11px; border-top: 1px solid var(--rule); max-width: 70ch;
+  }
+
+  /* ---------- query blocks ---------- */
+
+  .query { margin: 0 0 20px; }
+  .query-title {
+    font-size: .89rem; font-weight: 600; margin: 0 0 7px;
+    display: flex; gap: 9px; align-items: baseline;
+  }
+  .query-title b {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .7rem; letter-spacing: .08em; color: var(--accent-ink);
+    font-weight: 500; flex: none;
+  }
+  pre {
+    margin: 0 0 9px; padding: 13px 15px;
+    background: var(--surface); border: 1px solid var(--rule-firm);
+    border-radius: 3px; overflow-x: auto;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .765rem; line-height: 1.72; color: var(--ink);
+    tab-size: 2;
+  }
+  pre .op { color: var(--accent-ink); }
+  pre .cm { color: var(--muted); }
+  .query p { font-size: .855rem; color: var(--ink-2); margin: 0; }
+
+  /* ---------- reason list ---------- */
+
+  ol.reasons { margin: 0; padding: 0; list-style: none; counter-reset: r; }
+  ol.reasons li {
+    counter-increment: r; position: relative;
+    padding: 0 0 0 40px; margin-bottom: 18px; max-width: 70ch;
+  }
+  ol.reasons li:last-child { margin-bottom: 0; }
+  ol.reasons li::before {
+    content: counter(r);
+    position: absolute; left: 0; top: 1px;
+    width: 25px; height: 25px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--accent-wash); color: var(--accent-ink);
+    border: 1px solid var(--accent);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .7rem; font-weight: 600;
+  }
+  ol.reasons b { display: block; margin-bottom: 3px; }
+  ol.reasons p { font-size: .89rem; margin: 0; }
+
+  /* ---------- callout ---------- */
+
+  .callout {
+    border: 1px solid var(--rule); border-radius: 3px;
+    background: var(--surface); padding: 16px 18px; margin: 0 0 16px;
+  }
+  .callout.risk { border-left: 3px solid var(--crit); }
+  .callout.note { border-left: 3px solid var(--seal); }
+  .callout h3 { margin-top: 0; }
+  .callout p { font-size: .89rem; }
+
+  .off dt {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .8rem; font-weight: 600; color: var(--ink);
+    margin: 0 0 3px;
+  }
+  .off dd { margin: 0 0 14px; font-size: .88rem; color: var(--ink-2); max-width: 68ch; }
+  .off dd:last-child { margin-bottom: 0; }
+
+  footer {
+    margin-top: 8px; padding-top: 28px;
+    border-top: 2px solid var(--ink);
+    font-size: .82rem; color: var(--muted);
+  }
+  footer p { max-width: 74ch; }
+
+  @media (max-width: 900px) {
+    .field { grid-template-columns: 1fr; gap: 16px; padding: 34px 0; }
+    .rail-inner { position: static; }
+    .rail { padding-bottom: 4px; border-bottom: 1px solid var(--rule); }
+    .doc { padding: 0 20px 72px; }
+    .mast { padding: 44px 0 28px; }
+    .entity-life { margin-left: 0; width: 100%; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="doc">
+
+  <header class="mast">
+    <p class="kicker">Arkiv Ideathon · Challenge 3 · DeFi</p>
+    <h1>Proof-of-Fill</h1>
+    <p class="standfirst">An evidence board that lets holders of tokenized real-world assets verify the off-chain broker fill behind every mint — by opening the commitment the settlement contract already published.</p>
+    <ul class="meta">
+      <li><dt>Track</dt><dd>DeFi — Marcos</dd></li>
+      <li><dt>For</dt><dd>Arkiv Ideathon 2026</dd></li>
+      <li><dt>Entities</dt><dd>6 types</dd></li>
+      <li><dt>Queries</dt><dd>5 predicates</dd></li>
+      <li><dt>Status</dt><dd class="good">Design-ready</dd></li>
+    </ul>
+  </header>
+
+  <!-- ============ PROBLEM ============ -->
+  <section class="field">
+    <div class="rail"><div class="rail-inner">
+      <span class="rail-tag">Problem</span>
+      <span class="rail-label">The hash nobody can open</span>
+    </div></div>
+    <div class="body">
+      <h2>A commitment without its preimage</h2>
+      <p class="lede">Tokenized equity and RWA protocols settle on-chain but execute off-chain at a regulated broker. When a fill returns, the backend computes a salted keccak256 commitment and emits the hash in <code>OrderSettled</code>. The hash is permanent and public; the preimage sits in one 0600 JSON file on the operator's disk.</p>
+      <p>So the holder gets a <code>bytes32</code> they can never open: the issuer can withhold it, reveal it selectively, or lose it forever. Unlike a DEX, a broker's fill has no mempool or public print to check against. It's for holders who take "fair fill" on faith, and auditors who must price an issuer's trustworthiness.</p>
+
+      <figure>
+        <div class="figframe">
+          <svg viewBox="0 0 760 372" role="img" aria-label="Today, the settlement chain publishes a commitment hash while its preimage sits on the operator's disk, so a holder reading the chain gets an unopenable hash and must ask the operator for the preimage. With Arkiv, the preimage is published as an ExecutionProof entity, so the holder's own client recomputes the hash and verifies the fill without asking anyone.">
+            <defs>
+              <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" class="d-head"></path>
+              </marker>
+              <marker id="ahc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" class="d-head-crit"></path>
+              </marker>
+              <marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" class="d-head-accent"></path>
+              </marker>
+            </defs>
+
+            <!-- ROW 1 : TODAY -->
+            <text x="0" y="14" class="d-lane">TODAY</text>
+
+            <rect x="0" y="28" width="212" height="54" rx="2" class="d-box"></rect>
+            <text x="14" y="47" class="d-cap">SETTLEMENT CHAIN</text>
+            <text x="14" y="65" class="d-txt-b">OrderSettled</text>
+            <text x="14" y="76" class="d-mono">executionCommitment</text>
+
+            <rect x="0" y="104" width="212" height="54" rx="2" class="d-box"></rect>
+            <text x="14" y="123" class="d-cap">OPERATOR DISK · 0600</text>
+            <text x="14" y="141" class="d-txt">private-ledger.json</text>
+            <text x="14" y="152" class="d-mono">preimage + salt</text>
+
+            <rect x="520" y="62" width="240" height="60" rx="2" class="d-box"></rect>
+            <text x="534" y="81" class="d-cap">HOLDER</text>
+            <text x="534" y="100" class="d-mono">0x9f3a…c17d</text>
+            <text x="534" y="114" class="d-crit-txt">unopenable</text>
+
+            <line x1="212" y1="55" x2="520" y2="80" class="d-line" marker-end="url(#ah)"></line>
+            <text x="286" y="52" class="d-edge-lbl">reads commitment</text>
+
+            <line x1="520" y1="108" x2="214" y2="136" class="d-line-dash" marker-end="url(#ahc)"></line>
+            <text x="278" y="152" class="d-edge-lbl">must ask — may be refused, or lost</text>
+
+            <line x1="0" y1="186" x2="760" y2="186" class="d-div"></line>
+
+            <!-- ROW 2 : WITH ARKIV -->
+            <text x="0" y="212" class="d-lane">WITH ARKIV</text>
+
+            <rect x="0" y="226" width="212" height="54" rx="2" class="d-box"></rect>
+            <text x="14" y="245" class="d-cap">SETTLEMENT CHAIN</text>
+            <text x="14" y="263" class="d-txt-b">OrderSettled</text>
+            <text x="14" y="274" class="d-mono">executionCommitment</text>
+
+            <rect x="0" y="302" width="212" height="54" rx="2" class="d-box"></rect>
+            <text x="14" y="321" class="d-cap">ARKIV</text>
+            <text x="14" y="339" class="d-txt-b">ExecutionProof</text>
+            <text x="14" y="350" class="d-mono">preimage + salt · $creator</text>
+
+            <rect x="292" y="252" width="182" height="78" rx="2" class="d-box"></rect>
+            <text x="306" y="271" class="d-cap">HOLDER'S CLIENT</text>
+            <text x="306" y="291" class="d-mono">keccak256(preimage)</text>
+            <text x="306" y="309" class="d-mono">== commitment ?</text>
+            <text x="306" y="324" class="d-cap">$creator == issuer ?</text>
+
+            <line x1="212" y1="253" x2="292" y2="275" class="d-line" marker-end="url(#ah)"></line>
+            <text x="216" y="243" class="d-edge-lbl">commitment</text>
+
+            <line x1="212" y1="329" x2="292" y2="307" class="d-line" marker-end="url(#ah)"></line>
+            <text x="216" y="345" class="d-edge-lbl">query by orderId</text>
+
+            <rect x="554" y="269" width="206" height="44" rx="2" class="d-box-accent"></rect>
+            <text x="568" y="287" class="d-cap">VERDICT</text>
+            <text x="568" y="304" class="d-accent-txt">fill verified, or visibly absent</text>
+
+            <line x1="474" y1="291" x2="554" y2="291" class="d-line-accent" marker-end="url(#aha)"></line>
+          </svg>
+        </div>
+        <figcaption>The dashed edge is the whole problem: today the only path from a holder to the preimage runs through the party the preimage would incriminate. Publishing the preimage as an Arkiv entity replaces that request with a query, and turns non-publication from invisible into conspicuous.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ============ SOLUTION ============ -->
+  <section class="field">
+    <div class="rail"><div class="rail-inner">
+      <span class="rail-tag">Solution</span>
+      <span class="rail-label">Evidence board on Arkiv</span>
+    </div></div>
+    <div class="body">
+      <h2>Six entity types, one question</h2>
+      <p class="lede">Publish the preimage as an <code>ExecutionProof</code> entity. Every holder can now open every commitment themselves: fetch the proof by <code>orderId</code>, recompute <code>keccak256</code>, compare it to the on-chain hash, check <code>$creator</code> matches the issuer's wallet. Binary outcome, no interpretation.</p>
+      <p>The schema uses Arkiv's lifecycle primitives as product features, not compliance checkboxes:</p>
+      <ul class="plain">
+        <li><strong>Entity Expiration</strong> as a contest window — fills live for 180 days, exactly the period they're challengeable. The board is always the set of fills someone can still act on.</li>
+        <li><strong>Lifetime Extension</strong> as a dead-man's switch — the <code>ReserveAttestation</code> lives 31 days and must be renewed monthly. Go quiet, and the attestation vanishes. On a plain database a stale solvency claim looks current; here silence is the signal.</li>
+        <li><strong>$creator / $owner</strong> — immutable authorship means a proof not created by the issuer's wallet fails verification even if the hash matches. A <code>DisputeClaim</code>'s <code>$owner</code> is the holder, so the accused issuer cannot edit it, delete it, or let it lapse early.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ ENTITIES ============ -->
+  <section class="field">
+    <div class="rail"><div class="rail-inner">
+      <span class="rail-tag">Data model</span>
+      <span class="rail-label">Entities &amp; attributes</span>
+    </div></div>
+    <div class="body">
+      <h2>Six types, no joins</h2>
+      <p>Every entity carries <code>app="proof-of-fill"</code> so filters stay selective. Related entities share an <code>orderId</code> attribute and resolve with one equality filter. Every numeric attribute is an integer (prices in 6-decimal USDC base units, shares in atoms, deviations in basis points) because that is the only way to keep <code>gt</code>/<code>lt</code> available. Strings support <code>eq</code> only.</p>
+
+      <div class="entity">
+        <div class="entity-head">
+          <span class="entity-name">IntentCommitment</span>
+          <span class="entity-life">expiresIn 15552000 · 180 d</span>
+        </div>
+        <p>Written when the sealed order reaches escrow, <em>before</em> execution. Payload is the intent commitment hash, the ciphertext hash and the request tx hash — never plaintext.</p>
+        <dl>
+          <dt><span class="chip chip-str">str</span> attributes</dt>
+          <dd>kind="intent" · orderId · symbol · side · requester · venueId · settlementContract</dd>
+          <dt><span class="chip chip-int">int</span> attributes</dt>
+          <dd>chainId · committedAt · requestBlock</dd>
+        </dl>
+        <p class="why">Lifetime is pinned to the fill it precedes: if the intent expired first, the ordering check in Q5 would have nothing left to compare against.</p>
+      </div>
+
+      <div class="entity">
+        <div class="entity-head">
+          <span class="entity-name">ExecutionProof</span>
+          <span class="entity-life">expiresIn 15552000 · 180 d</span>
+        </div>
+        <p>The preimage of the on-chain commitment, written once after settlement and never updated. Payload carries every field of the commitment tuple plus the salt, so any reader can recompute the hash themselves.</p>
+        <dl>
+          <dt><span class="chip chip-str">str</span> attributes</dt>
+          <dd>kind="fill" · orderId · symbol · requester · venueId · deviationSide ("worse" | "better" | "equal")</dd>
+          <dt><span class="chip chip-int">int</span> attributes</dt>
+          <dd>chainId · filledAt · epochMonth (202608) · fillPriceUsdc (6-dec base) · benchmarkPriceUsdc (6-dec base) · absDeviationBps · benchmarkAgeSec · unitsMinted · settledUsdcBase · qualityTier (0 ≤10bps, 1 ≤50, 2 ≤200, 3 &gt;200)</dd>
+        </dl>
+        <p class="why">Deviation is signed, and I need range queries on its <em>magnitude</em> — so the magnitude is a non-negative integer and the direction is a separate string matched with <code>eq</code>. Storing a signed value as text would have cost me the range query outright. 180 days is the window in which a holder can still contest a fill.</p>
+      </div>
+
+      <div class="entity">
+        <div class="entity-head">
+          <span class="entity-name">BenchmarkSnapshot</span>
+          <span class="entity-life">expiresIn 2592000 · 30 d</span>
+        </div>
+        <p>The oracle reading used as the best-execution reference, written once per round rather than once per fill.</p>
+        <dl>
+          <dt><span class="chip chip-str">str</span> attributes</dt>
+          <dd>kind="benchmark" · symbol · feedId · roundKey</dd>
+          <dt><span class="chip chip-int">int</span> attributes</dt>
+          <dd>publishTime · priceUsdc · confBps</dd>
+        </dl>
+        <p class="why">Deliberately shorter-lived than the proofs that reference it. Each ExecutionProof carries the benchmark values inline in its own payload, so this entity is a convenience index for "every fill priced off this round", not a source of truth. When it expires, verification still works — only the cross-fill grouping view degrades.</p>
+      </div>
+
+      <div class="entity">
+        <div class="entity-head">
+          <span class="entity-name">ReserveAttestation</span>
+          <span class="entity-life">expiresIn 2678400 · 31 d, extended monthly</span>
+        </div>
+        <p>Per-epoch solvency disclosure for one symbol: what the broker actually holds against what the contract has minted.</p>
+        <dl>
+          <dt><span class="chip chip-str">str</span> attributes</dt>
+          <dd>kind="reserve" · symbol · attestor</dd>
+          <dt><span class="chip chip-int">int</span> attributes</dt>
+          <dd>epoch · attestedAt · brokerShareAtoms · unitsOutstanding · escrowUsdcBase · coverageRatioBps (10000 = 100%)</dd>
+        </dl>
+        <p class="why">The one entity meant to be kept alive rather than left to lapse — its short lifetime is the mechanism, not housekeeping.</p>
+      </div>
+
+      <div class="entity">
+        <div class="entity-head">
+          <span class="entity-name">DisputeClaim</span>
+          <span class="entity-life">expiresIn 1209600 · 14 d</span>
+        </div>
+        <p>A holder's challenge to a specific fill. <code>$owner</code> is the holder.</p>
+        <dl>
+          <dt><span class="chip chip-str">str</span> attributes</dt>
+          <dd>kind="claim" · orderId · symbol · claimant</dd>
+          <dt><span class="chip chip-int">int</span> attributes</dt>
+          <dd>filedAt · claimedFairPriceUsdc · claimedHarmUsdcBase</dd>
+        </dl>
+        <p class="why">A claim is a short-lived request for an answer, so it lives 14 days and then lapses off the board.</p>
+      </div>
+
+      <div class="entity">
+        <div class="entity-head">
+          <span class="entity-name">DisputeResponse</span>
+          <span class="entity-life">expiresIn 15552000 · 180 d</span>
+        </div>
+        <p>The issuer's answer, as a separate append-only entity. <code>$owner</code> is the issuer.</p>
+        <dl>
+          <dt><span class="chip chip-str">str</span> attributes</dt>
+          <dd>kind="response" · orderId · claimKey · outcome ("upheld" | "rejected" | "remediated")</dd>
+          <dt><span class="chip chip-int">int</span> attributes</dt>
+          <dd>respondedAt · remediationUsdcBase</dd>
+        </dl>
+        <p class="why">Split from the claim on purpose. <code>updateEntity</code> is a full replace, so one shared mutable entity written by two adversarial parties would let either silently drop the other's attributes — and the read-then-write has a race. Append-only removes the shared writer entirely; status is derived client-side by joining on <code>orderId</code>, and a claim with no response past its window reads as lapsed. The response outlives the claim because it is part of the permanent record of the fill it concerns.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ QUERIES ============ -->
+  <section class="field">
+    <div class="rail"><div class="rail-inner">
+      <span class="rail-tag">Data model</span>
+      <span class="rail-label">The queries it lives on</span>
+    </div></div>
+    <div class="body">
+      <h2>Five predicates</h2>
+
+      <div class="query">
+        <p class="query-title"><b>Q1</b> Open one commitment — the query the product exists for</p>
+        <pre><span class="op">eq</span>(app,"proof-of-fill") · <span class="op">eq</span>(kind,"fill") · <span class="op">eq</span>(orderId,"tl-8f21…")
+<span class="op">limit</span>(1)</pre>
+        <p>The client recomputes <code>keccak256</code> over the returned payload, compares it with the <code>executionCommitment</code> read from the settlement chain, and checks <code>$creator</code> against the issuer's known settlement wallet. A hash that matches but a creator that doesn't is still a failure. Binary outcome, no interpretation.</p>
+      </div>
+
+      <div class="query">
+        <p class="query-title"><b>Q2</b> Best-execution outlier report for one month</p>
+        <pre><span class="op">eq</span>(kind,"fill") · <span class="op">eq</span>(symbol,"TSLA") · <span class="op">eq</span>(epochMonth,202608)
+  · <span class="op">eq</span>(deviationSide,"worse") · <span class="op">gt</span>(absDeviationBps,50)
+
+<span class="cm">// denominator, as a count — not a fetch</span>
+<span class="op">count</span>( <span class="op">eq</span>(kind,"fill") · <span class="op">eq</span>(symbol,"TSLA") · <span class="op">eq</span>(epochMonth,202608) )</pre>
+        <p>Renders as one sentence a holder can act on: <em>3 of 412 August TSLA fills came back more than 50 bps worse than the oracle benchmark.</em> The count is what keeps this a dashboard query instead of pulling the whole month down.</p>
+      </div>
+
+      <div class="query">
+        <p class="query-title"><b>Q3</b> Worst fills, without a server-side ORDER BY</p>
+        <pre><span class="op">eq</span>(kind,"fill") · <span class="op">eq</span>(symbol,"TSLA") · <span class="op">eq</span>(qualityTier,3)
+<span class="cm">// then sort client-side on absDeviationBps</span></pre>
+        <p>There is no server-side ordering, so limit-then-sort would return the top of a page rather than a true top N. Narrowing on <code>qualityTier</code> — a coarse integer bucket written at creation time — makes the candidate set small enough to fetch whole before sorting. That attribute exists for no other reason.</p>
+      </div>
+
+      <div class="query">
+        <p class="query-title"><b>Q4</b> Live solvency — and its absence</p>
+        <pre><span class="op">eq</span>(kind,"reserve") · <span class="op">eq</span>(symbol,"TSLA") · <span class="op">limit</span>(1)
+<span class="cm">// results are newest-first, the one ordering available and the one I need</span>
+
+<span class="cm">// alert sweep across all symbols</span>
+<span class="op">eq</span>(kind,"reserve") · <span class="op">lt</span>(coverageRatioBps,10000)</pre>
+        <p>If the first query returns nothing at all, the issuer stopped extending the attestation and the dashboard renders <em>attestation lapsed</em>. Absence is the signal — which only works because expiry is enforced by the protocol rather than by the issuer's cron.</p>
+      </div>
+
+      <div class="query">
+        <p class="query-title"><b>Q5</b> Ordering check — front-running evidence</p>
+        <pre><span class="op">eq</span>(kind,"intent") · <span class="op">eq</span>(symbol,"TSLA") · <span class="op">gt</span>(committedAt,T0) · <span class="op">lt</span>(committedAt,T1)
+<span class="op">eq</span>(kind,"fill")   · <span class="op">eq</span>(symbol,"TSLA") · <span class="op">gt</span>(filledAt,T0)    · <span class="op">lt</span>(filledAt,T1)</pre>
+        <p>Join the two sets on <code>orderId</code> and confirm every fill has an intent whose Arkiv write landed before it. A fill with no prior intent, or an intent written after its own fill, is evidence the operator traded ahead of the order it was holding.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COUNTERFACTUAL ============ -->
+  <section class="field">
+    <div class="rail"><div class="rail-inner">
+      <span class="rail-tag">Rationale</span>
+      <span class="rail-label">Why Arkiv, not Postgres</span>
+    </div></div>
+    <div class="body">
+      <h2>What breaks on a plain database</h2>
+      <ol class="reasons">
+        <li>
+          <b>The accused would own the evidence.</b>
+          <p>On the issuer's own database the issuer is also the auth layer: they can backdate a proof, quietly drop a dispute filed against them, or serve one reader a different row. Immutable <code>$creator</code> plus holder-owned claims makes the board something the accused cannot rewrite. Without that, an issuer-hosted audit page is a nicer way of saying <em>trust me</em>.</p>
+        </li>
+        <li>
+          <b>The ordering check needs timestamps I don't control.</b>
+          <p>Q5's entire value is that the intent was committed <em>before</em> the fill. An operator's <code>created_at</code> is a column the operator writes; an Arkiv write is a transaction with a hash. Remove that and front-running detection isn't weaker, it's worthless.</p>
+        </li>
+        <li>
+          <b>Expiry has to be a guarantee, not a cron job.</b>
+          <p>The dead-man's switch only works if lapsing is enforced by something other than the party it embarrasses. A paused cron leaves a stale attestation reading as current solvency — the exact failure the mechanism exists to prevent.</p>
+        </li>
+        <li>
+          <b>Publication becomes a precondition.</b>
+          <p>Today the preimage's existence is entirely at the operator's discretion, and its absence is invisible. Writing it to a public queryable store means the audit trail either exists for everyone or visibly doesn't exist at all — and the gap between the on-chain settlement count and the proof-entity count is itself a published number.</p>
+        </li>
+      </ol>
+      <h3>And why not simply on-chain</h3>
+      <p>Event logs aren't filterable, countable or paginable by field, so Q2 and Q3 are impossible without a private indexer — which puts us straight back to trusting an operator. Keeping preimages on-chain forever would also be permanently costly and permanently disclosing, where the whole point is a bounded window.</p>
+    </div>
+  </section>
+
+  <!-- ============ OFF ARKIV ============ -->
+  <section class="field">
+    <div class="rail"><div class="rail-inner">
+      <span class="rail-tag">Boundaries</span>
+      <span class="rail-label">What stays off Arkiv</span>
+    </div></div>
+    <div class="body">
+      <h2>Deliberate omissions</h2>
+      <dl class="off">
+        <dt>Escrow, mint and burn, transfer restrictions</dt>
+        <dd>The authoritative movement of money and tokens stays on the settlement chain. Arkiv is read after settlement, never in the path of a trade.</dd>
+
+        <dt>Broker routing and order handling</dt>
+        <dd>The execution hot path stays at the venue. Nothing in a trade waits on an Arkiv write.</dd>
+
+        <dt>Pre-trade order plaintext</dt>
+        <dd>Only the commitment goes up before execution. Publishing size, side and symbol ahead of a fill would manufacture the exact front-running this design exists to detect. The reveal lands after settlement, when the information is stale.</dd>
+
+        <dt>Holder portfolios and any PII</dt>
+        <dd>Per-holder positions stay in the issuer's private ledger. Arkiv carries per-order proofs keyed by a pseudonymous wallet — which is pseudonymity, not privacy, and I flag that as a real tradeoff rather than a solved problem.</dd>
+
+        <dt>Broker statements and documents</dt>
+        <dd>Hash on Arkiv, blob elsewhere.</dd>
+
+        <dt>Enforcement</dt>
+        <dd>Arkiv stores and answers queries; it runs no triggers. A lapsed attestation or an unanswered claim is a state the app reads and interprets — nothing on Arkiv punishes anyone, and the pitch doesn't pretend otherwise.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <!-- ============ ADOPTION + RISK ============ -->
+  <section class="field">
+    <div class="rail"><div class="rail-inner">
+      <span class="rail-tag">Adoption</span>
+      <span class="rail-label">Who writes the first hundred entities</span>
+    </div></div>
+    <div class="body">
+      <h2>Single-player from day one</h2>
+      <p>An issuer can publish unilaterally and get value immediately, because verifiable best execution is a claim no competitor can currently make. Every tokenized-equity issuer says <em>fully backed</em>; none of them can be checked. The first hundred entities are mine — a backfill of existing paper fills. The activation event is the first time someone who is not the operator pastes an order id from their own wallet history and watches the hash match.</p>
+      <p>The second party is where it compounds. Because the schema is shared rather than proprietary, a third party can build a comparison board that ranks issuers on measured deviation instead of marketing copy — and at that point non-publication becomes conspicuous rather than merely unhelpful.</p>
+
+      <div class="callout risk">
+        <h3>The assumption that would kill it</h3>
+        <p>That an issuer will voluntarily publish evidence which can later be used to prove they gave someone a bad fill. If that is false, the idea as pitched dies.</p>
+        <p>Reasons it may hold: a new entrant can use transparency as a wedge against incumbents; best-execution reporting is already an obligation on the TradFi leg, so this is a cheaper automatic version of a report the issuer owes anyway; and deviation against a public oracle is a metric an issuer improves by routing better, which makes it a scoreboard rather than a confession.</p>
+        <p>How to test it without deploying anything: backfill the existing fill history, compute what the outlier report would actually have said, and put that page in front of two or three RWA issuers. If the answer is <em>we would never publish this</em>, the design survives by inverting — a third-party board built only from on-chain commitments and independent oracle data, where the <em>missing</em> preimage is the finding. That fallback needs no issuer cooperation, which is why the riskiest assumption is survivable rather than fatal.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCOPE ============ -->
+  <section class="field">
+    <div class="rail"><div class="rail-inner">
+      <span class="rail-tag">Scope</span>
+      <span class="rail-label">The weekend slice</span>
+    </div></div>
+    <div class="body">
+      <h2>Audit view — one order id, one verdict</h2>
+      <p>Paste an order id, get a verdict. It reads the <code>OrderSettled</code> commitment from the settlement chain, fetches the matching <code>ExecutionProof</code> entity from Arkiv, recomputes <code>keccak256</code> over the payload, and renders one of three states — verified, mismatch, or not published — beside the fill price, the oracle benchmark at fill time, and the deviation in bps.</p>
+      <p>That's two entity types (<code>IntentCommitment</code>, <code>ExecutionProof</code>), one write added to the existing settlement listener, and two queries. The first 100 entities are a backfill of paper fills already in the private ledger, so it verifies real fills from minute one.</p>
+      <p><strong>Not in v1:</strong> the dispute pair and the cross-issuer board — both add a second party before the single-issuer loop is proven.</p>
+      <div class="callout note">
+        <h3>No deployment involved</h3>
+        <p>The slice is designed, not deployed. Braga testnet sunset on 12 August 2026 and the public testnet arrives in September, so the schema above is offline design against the SDK's shape — which is what the event asks for.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Submitted to the Arkiv Ideathon 2026, DeFi track (Marcos, 21–31 Aug). Entity semantics, SDK constraints and rubric weights are from the ideathon knowledge base as of 28 August 2026. The commitment scheme is implemented at <a href="https://github.com/mohitagarwal/TradeLayer">github.com/mohitagarwal/TradeLayer</a> — this pitch is the Arkiv layer that opens the commitments.</p>
+  </footer>
+
+</div>
+
+</body>
+</html>
