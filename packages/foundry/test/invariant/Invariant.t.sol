@@ -1,184 +1,210 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { Test } from "forge-std/Test.sol";
-import { TradeLayer } from "../../contracts/TradeLayer.sol";
+import { Test, console } from "forge-std/Test.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { ConfidentialLedger } from "../../contracts/ConfidentialLedger.sol";
+import { OrderEscrow } from "../../contracts/OrderEscrow.sol";
+import { OmnibusVault } from "../../contracts/OmnibusVault.sol";
+import { OrgWalletRegistry } from "../../contracts/OrgWalletRegistry.sol";
+import { ComplianceRouter } from "../../contracts/ComplianceRouter.sol";
+import { IHederaTokenService } from "../../contracts/interfaces/IHederaTokenService.sol";
+import { IHederaScheduleService } from "../../contracts/interfaces/IHederaScheduleService.sol";
+import { IAtsSecurityToken } from "../../contracts/interfaces/IAtsSecurityToken.sol";
+import { IAtsCompliance } from "../../contracts/interfaces/IAtsCompliance.sol";
+import { IOrgWalletRegistry } from "../../contracts/interfaces/IOrgWalletRegistry.sol";
 import { MockUSDC } from "../../contracts/mocks/MockUSDC.sol";
-import { MockAtsSecurityToken } from "../../contracts/mocks/MockAtsSecurityToken.sol";
+import { MockAts } from "../../contracts/mocks/MockAts.sol";
+import { MockHts } from "../../contracts/mocks/MockHts.sol";
+import { MockScheduleService } from "../../contracts/mocks/MockScheduleService.sol";
 import { Handler } from "./Handler.t.sol";
 
-contract TradeLayerInvariantTest is Test {
-    TradeLayer public tradeLayer;
-    MockUSDC public usdc;
-    MockAtsSecurityToken public dstock;
-    Handler public handler;
+/// @dev System-level properties under stateful fuzzing.
+///
+/// The old suite proved solvency through the company token's supply. With no token of our own,
+/// solvency is now a statement about the USDC itself: every cent ever deposited is either still
+/// in the omnibus, sitting in the escrow against an open order, or was explicitly paid out by an
+/// enclave-signed authorization. Nothing else can move it.
+contract TradeLayerInvariants is Test {
+    uint256 internal constant ENCLAVE_KEY = 0xE1C1A7E;
+    bytes32 internal constant ORG = "FUZZ";
+    bytes32 internal constant TSLA = "TSLA";
+    bytes32 internal constant VOO = "VOO";
+
+    MockUSDC usdc;
+    MockHts hts;
+    MockScheduleService hss;
+    MockAts tsla;
+    MockAts voo;
+    OrgWalletRegistry registry;
+    ComplianceRouter router;
+    ConfidentialLedger ledger;
+    OmnibusVault vault;
+    OrderEscrow escrow;
+    Handler handler;
 
     function setUp() public {
+        address enclave = vm.addr(ENCLAVE_KEY);
         usdc = new MockUSDC();
-        dstock = new MockAtsSecurityToken("TradeLayer Equity", "DSTOCK");
-        tradeLayer = new TradeLayer(address(usdc), address(2), address(dstock));
-        dstock.setAgent(address(tradeLayer));
-        handler = new Handler(tradeLayer, usdc, dstock);
+        hts = new MockHts();
+        hss = new MockScheduleService();
 
-        // Issuer (this contract) KYC's every fuzz actor so ATS mint succeeds.
-        address[] memory actors = handler.getActors();
+        registry = new OrgWalletRegistry(address(this));
+        ledger = new ConfidentialLedger(address(this), enclave);
+        vault = new OmnibusVault(
+            address(this), enclave, IHederaTokenService(address(hts)), IERC20(address(usdc)), IOrgWalletRegistry(address(registry))
+        );
+        escrow = new OrderEscrow(
+            address(this),
+            enclave,
+            ledger,
+            vault,
+            IOrgWalletRegistry(address(registry)),
+            IERC20(address(usdc)),
+            IHederaScheduleService(address(hss))
+        );
+        router = new ComplianceRouter(address(this), IOrgWalletRegistry(address(registry)), address(this));
+        ledger.setEscrow(address(escrow));
+        vault.setEscrow(address(escrow));
+        registry.bindPlatformAccount(address(vault));
+        registry.bindPlatformAccount(address(escrow));
+
+        tsla = new MockAts("Tesla Equity", "TSLA-t", 0);
+        voo = new MockAts("Vanguard Equity", "VOO-t", 0);
+
+        address[] memory actors = new address[](3);
+        actors[0] = makeAddr("alice");
+        actors[1] = makeAddr("bob");
+        actors[2] = makeAddr("carol");
+
+        MockAts[] memory equities = new MockAts[](2);
+        equities[0] = tsla;
+        equities[1] = voo;
+        bytes32[] memory symbols = new bytes32[](2);
+        symbols[0] = TSLA;
+        symbols[1] = VOO;
+
+        handler = new Handler(ledger, escrow, vault, router, usdc, equities, symbols, hss, actors);
+
+        // The handler runs the institution; the actors are its employees, bound by mutual consent.
+        vm.prank(address(handler));
+        registry.registerOrg(ORG);
         for (uint256 i = 0; i < actors.length; i++) {
-            dstock.grantKyc(actors[i]);
+            vm.prank(actors[i]);
+            registry.proposeJoin(ORG);
+            vm.prank(address(handler));
+            registry.approveJoin(actors[i]);
         }
 
-        tradeLayer.setBackendWallet(address(handler));
-        usdc.mint(address(tradeLayer), 10_000_000e6);
+        _configureAts(tsla);
+        _configureAts(voo);
+        vault.registerAts(TSLA, IAtsSecurityToken(address(tsla)));
+        vault.registerAts(VOO, IAtsSecurityToken(address(voo)));
+        router.registerToken(TSLA, IAtsCompliance(address(tsla)));
+        router.registerToken(VOO, IAtsCompliance(address(voo)));
+
+        // Only now can the institution admit its people — the router needs its tokens first.
+        for (uint256 i = 0; i < actors.length; i++) {
+            vm.prank(address(handler));
+            router.admitMember(actors[i]);
+        }
+
+        usdc.mint(address(handler), 5_000_000e6);
+        vm.deal(address(escrow), 100 ether);
 
         targetContract(address(handler));
-
-        bytes4[] memory selectors = new bytes4[](4);
-        selectors[0] = Handler.buyStock.selector;
-        selectors[1] = Handler.fulfillBuyRequest.selector;
-        selectors[2] = Handler.redeemStock.selector;
-        selectors[3] = Handler.fulfillRedeemRequest.selector;
-
-        targetSelector(FuzzSelector({ addr: address(handler), selectors: selectors }));
     }
 
-    /* ---------- INVARIANT 1: USDC CONSERVATION ---------- */
-
-    /// @notice Contract must hold enough USDC to cover all pending buy requests
-    function invariant_usdcConservation() public view {
-        uint256 contractBalance = usdc.balanceOf(address(tradeLayer));
-        uint256 totalPendingUsdc = handler.getTotalPendingUsdc();
-
-        assertGe(contractBalance, totalPendingUsdc, "INVARIANT VIOLATED: Contract USDC < Pending USDC");
+    function _configureAts(MockAts token) internal {
+        token.grantRole(token.AGENT_ROLE(), address(vault));
+        token.grantRole(token.KYC_ROLE(), address(router));
+        token.grantRole(token.CONTROL_LIST_ROLE(), address(router));
+        token.grantRole(token.FREEZE_MANAGER_ROLE(), address(router));
+        token.grantKyc(address(vault), "setup", block.timestamp, block.timestamp + 365 days, address(this));
+        token.addToControlList(address(vault));
     }
 
-    /* ---------- INVARIANT 2: TOKEN SUPPLY = TOTAL HOLDINGS ---------- */
+    /* ---------- solvency: every deposited cent is accounted for ---------- */
 
-    /// @notice Total supply of DSTOCK must equal sum of all user holdings
-    function invariant_tokenSupplyEqualsHoldings() public view {
-        uint256 totalSupply = tradeLayer.totalSupply();
-        uint256 sumOfHoldings = handler.getSumOfAllHoldings();
-
-        assertEq(totalSupply, sumOfHoldings, "INVARIANT VIOLATED: Total Supply != Sum of Holdings");
+    function invariant_usdcIsFullyAccountedFor() public view {
+        uint256 held = usdc.balanceOf(address(vault)) + usdc.balanceOf(address(escrow));
+        assertEq(held, handler.ghost_deposited() - handler.ghost_paidOut(), "USDC appeared or vanished");
+        assertEq(vault.reserve(), held, "reserve() must equal what the system actually holds");
     }
 
-    /* ---------- INVARIANT 3: AGGREGATE TOKEN MATCHES PRIVATE LEDGER ---------- */
+    /// @dev The product claim: an employee is given authority, never custody. The only way USDC
+    /// can reach an employee's wallet is an enclave-signed payout.
+    function invariant_employeesNeverHoldCompanyCash() public view {
+        uint256 sum;
+        for (uint256 i = 0; i < handler.actorCount(); i++) {
+            sum += usdc.balanceOf(handler.actors(i));
+        }
+        assertEq(sum, handler.ghost_paidOut(), "employee wallets hold USDC that was never paid out");
+    }
 
-    /// @notice Per-stock positions remain in the private backend ledger. Their
-    /// aggregate must equal the user's public DSTOCK balance.
-    function invariant_settlementMatchesIntent() public view {
-        address[] memory actors = handler.getActors();
-        string[] memory stocks = handler.getStocks();
+    function invariant_escrowHoldsExactlyTheOpenOrders() public view {
+        uint256 sum;
+        for (uint256 i = 0; i < handler.openCount(); i++) {
+            OrderEscrow.Order memory o = escrow.order(handler.openId(i));
+            assertEq(uint8(o.status), uint8(OrderEscrow.Status.OPEN), "tracked order is not OPEN");
+            sum += o.amount;
+        }
+        assertEq(usdc.balanceOf(address(escrow)), sum, "escrow balance != sum of OPEN orders");
+        assertEq(vault.committed(), sum, "committed != sum of OPEN orders");
+        assertEq(handler.ghost_openEscrow(), sum, "ghost drifted from reality");
+    }
 
-        for (uint256 i = 0; i < actors.length; i++) {
-            uint256 privateAggregate;
-            for (uint256 j = 0; j < stocks.length; j++) {
-                privateAggregate += handler.ghost_holdings(actors[i], stocks[j]);
-            }
+    /* ---------- order lifecycle ---------- */
+
+    function invariant_ordersTerminateAtMostOnce() public view {
+        for (uint256 i = 0; i < handler.orderCount(); i++) {
+            bytes32 id = handler.allOrders(i);
+            assertLe(handler.ghost_terminalCount(id), 1, "an order terminated more than once");
+            OrderEscrow.Order memory o = escrow.order(id);
+            assertTrue(o.status != OrderEscrow.Status.NONE, "a tracked order does not exist");
+        }
+    }
+
+    function invariant_ledgerVersionsMatchGhost() public view {
+        for (uint256 i = 0; i < handler.actorCount(); i++) {
+            bytes32 id = keccak256(abi.encodePacked(handler.actors(i)));
+            assertEq(ledger.version(id), handler.ghost_ledgerVersion(id), "ledger version != ghost");
+        }
+    }
+
+    /* ---------- equities ---------- */
+
+    function invariant_atsSupplyEqualsNetMints() public view {
+        MockAts[2] memory eq = [tsla, voo];
+        bytes32[2] memory sym = [TSLA, VOO];
+        for (uint256 i = 0; i < 2; i++) {
+            uint256 expected = handler.ghost_minted(sym[i]) - handler.ghost_burned(sym[i]);
+            assertEq(eq[i].totalSupply(), expected, "ATS supply != minted - burned");
             assertEq(
-                tradeLayer.balanceOf(actors[i]),
-                privateAggregate,
-                "INVARIANT VIOLATED: DSTOCK != private holdings aggregate"
+                eq[i].balanceOf(address(vault)) + handler.ghost_transferredOut(sym[i]),
+                expected,
+                "vault holdings + withdrawals != supply"
             );
         }
     }
 
-    /* ---------- INVARIANT 4: REDEMPTION LOCKS ARE COVERED ---------- */
-
-    /// @notice A user can never lock more DSTOCK than their aggregate balance.
-    function invariant_userBalanceCoversHoldings() public view {
-        address[] memory actors = _getActors();
-
-        for (uint256 i = 0; i < actors.length; i++) {
-            uint256 balance = tradeLayer.balanceOf(actors[i]);
-            assertGe(
-                balance,
-                tradeLayer.lockedForRedeem(actors[i]),
-                string(
-                    abi.encodePacked("INVARIANT VIOLATED: User balance < locked amount for ", vm.toString(actors[i]))
-                )
-            );
+    /// @dev Membership is the only public fact about a wallet, and it never changes by itself.
+    function invariant_actorsStayBoundToTheirInstitution() public view {
+        for (uint256 i = 0; i < handler.actorCount(); i++) {
+            assertEq(registry.orgOf(handler.actors(i)), ORG, "an employee lost their institution");
         }
     }
-
-    /* ---------- INVARIANT 5: TRANSFERS REQUIRE KYC ---------- */
-
-    /// @notice Secondary transfers of DSTOCK must fail when the recipient is not KYC'd.
-    function invariant_transfersRequireKyc() public {
-        address[] memory actors = _getActors();
-
-        for (uint256 i = 0; i < actors.length; i++) {
-            uint256 balance = tradeLayer.balanceOf(actors[i]);
-            if (balance == 0 || actors.length < 2) continue;
-
-            address recipient = actors[(i + 1) % actors.length];
-            // Temporarily revoke recipient KYC to assert the compliance gate.
-            dstock.revokeKyc(recipient);
-
-            vm.prank(actors[i]);
-            try dstock.transfer(recipient, 1) {
-                fail("INVARIANT VIOLATED: transfer to non-KYC recipient should revert");
-            } catch {
-                // expected
-            }
-
-            dstock.grantKyc(recipient);
-        }
-    }
-
-    /* ---------- INVARIANT 6: ACCOUNTING CONSISTENCY ---------- */
-
-    /// @notice Ghost variable tracking should match actual state
-    function invariant_ghostVariableConsistency() public view {
-        // Total minted should equal total supply - total burned
-        uint256 netSupply = handler.ghost_totalTokensMinted() - handler.ghost_totalTokensBurned();
-
-        assertEq(
-            netSupply, tradeLayer.totalSupply(), "INVARIANT VIOLATED: Ghost tracking inconsistent with actual supply"
-        );
-    }
-
-    /* ---------- INVARIANT 7: NO DUPLICATE ORDER PROCESSING ---------- */
-
-    /// @notice Each successful settlement marks exactly one new order processed, so
-    /// the number of settlements the handler performed must equal the number of
-    /// orderIds the contract has flagged as processed. Processing an order twice
-    /// would increment the former without the latter.
-    function invariant_noDuplicateOrderProcessing() public view {
-        assertEq(
-            handler.ghost_ordersProcessed(),
-            handler.countProcessedOrders(),
-            "INVARIANT VIOLATED: settlement count != processed order count"
-        );
-    }
-
-    /* ---------- INVARIANT 8: BUY ESCROW IS SEGREGATED ---------- */
-
-    /// @notice The contract's own accounting of USDC reserved against unsettled buy
-    /// requests must equal the sum of those requests. Combined with invariant #1
-    /// this is what makes escrow solvency structural rather than incidental: a
-    /// redemption payout can only draw on the balance above `escrowedBuyUsdc`, so it
-    /// cannot be funded out of another user's unfilled purchase.
-    function invariant_buyEscrowSegregated() public view {
-        assertEq(
-            tradeLayer.escrowedBuyUsdc(),
-            handler.getTotalPendingUsdc(),
-            "INVARIANT VIOLATED: escrowedBuyUsdc != sum of pending buy orders"
-        );
-    }
-
-    /* ---------- HELPERS ---------- */
-
-    // Delegate to the handler so the actor/stock sets cannot drift apart.
-    function _getActors() internal view returns (address[] memory) {
-        return handler.getActors();
-    }
-
-    function _getStocks() internal view returns (string[] memory) {
-        return handler.getStocks();
-    }
-
-    /* ---------- AFTER INVARIANT ---------- */
 
     function invariant_callSummary() public view {
-        handler.callSummary();
+        console.log("deposit      ", handler.calls("deposit"));
+        console.log("openBuy      ", handler.calls("openBuy"));
+        console.log("settle       ", handler.calls("settle"));
+        console.log("cancel       ", handler.calls("cancel"));
+        console.log("refund       ", handler.calls("refund"), "(scheduled:", handler.ghost_scheduledRefundsFired());
+        console.log("ledgerUpdate ", handler.calls("ledgerUpdate"));
+        console.log("mintAts      ", handler.calls("mintAts"));
+        console.log("burnAts      ", handler.calls("burnAts"));
+        console.log("transferAts  ", handler.calls("transferAts"));
+        console.log("payout       ", handler.calls("payout"));
     }
 }
