@@ -1,0 +1,7 @@
+.env
+.env.*
+!.env.example
+.cre/
+**/node_modules/
+**/dist/
+**/*.wasm

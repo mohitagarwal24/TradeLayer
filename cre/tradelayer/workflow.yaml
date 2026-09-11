@@ -1,0 +1,20 @@
+# ==========================================================================
+# CRE WORKFLOW SETTINGS — TradeLayer confidential settlement
+# ==========================================================================
+# One workflow, four confidential handlers (all `handlerInTee`):
+#   trigger 0  H1 intake     HTTP  — opens a sealed order, places ONE broker order
+#   trigger 1  H2 reconcile  cron  — polls fills, signs atomic settlements
+#   trigger 2  H3 batch      cron  — nets fills per symbol across every institution
+#   trigger 3  H4 policy     HTTP  — opens an institution's sealed rulebook
+#
+# Hedera testnet is the only target. There is no local profile and no mock broker: the states
+# that matter (queued outside market hours, partial fills, rejections) only exist against the
+# real chain and the real broker.
+# ==========================================================================
+testnet-settings:
+  user-workflow:
+    workflow-name: "tradelayer"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config/config.testnet.json"
+    secrets-path: "../secrets.yaml"

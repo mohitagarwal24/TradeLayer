@@ -1,0 +1,12 @@
+# ==========================================================================
+# CRE PROJECT SETTINGS — TradeLayer
+# ==========================================================================
+# Hedera is not a CRE-supported chain, so the enclave never uses EVMClient against it: every
+# Hedera read is an eth_call over HTTPS to the JSON-RPC relay, and every write is an EIP-712
+# authorization POSTed to the relayer, which submits it. Sepolia is listed only to satisfy the
+# CLI's chain configuration and for the optional attestation anchor.
+# ==========================================================================
+testnet-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://ethereum-sepolia-rpc.publicnode.com
