@@ -1,17 +1,22 @@
-import { http, createConfig } from "wagmi";
-import { foundry } from "wagmi/chains";
+import { createConfig, http } from "wagmi";
 import { injected } from "wagmi/connectors";
-import { hederaTestnet } from "~~/scaffold.config";
+import { defineChain } from "viem";
 
-const targetNetworks = [foundry, hederaTestnet] as const;
-
-export const config = createConfig({
-  chains: targetNetworks,
-  connectors: [injected()],
-  transports: {
-    [foundry.id]: http("http://127.0.0.1:8545"),
-    [hederaTestnet.id]: http("https://testnet.hashio.io/api"),
-  },
+/**
+ * Hedera testnet only. The local dev chain used to appear in the network picker, which meant a
+ * user could select a network the app could not actually settle on.
+ */
+export const hederaTestnet = defineChain({
+  id: 296,
+  name: "Hedera Testnet",
+  nativeCurrency: { name: "HBAR", symbol: "HBAR", decimals: 18 },
+  rpcUrls: { default: { http: ["https://testnet.hashio.io/api"] } },
+  blockExplorers: { default: { name: "HashScan", url: "https://hashscan.io/testnet" } },
+  testnet: true,
 });
 
-export { targetNetworks };
+export const config = createConfig({
+  chains: [hederaTestnet],
+  connectors: [injected()],
+  transports: { [hederaTestnet.id]: http("https://testnet.hashio.io/api", { batch: false }) },
+});

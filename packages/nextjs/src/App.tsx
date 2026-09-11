@@ -1,5 +1,4 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -7,28 +6,33 @@ import { WagmiProvider } from "wagmi";
 import { config } from "@/lib/wagmi";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import Index from "./pages/Index";
-import Portfolio from "./pages/Portfolio";
+import Home from "./pages/Home";
+import Institution from "./pages/Institution";
+import Trade from "./pages/Trade";
+import Positions from "./pages/Positions";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { refetchOnWindowFocus: false, staleTime: 5_000 } },
+});
 
 const App = () => (
   <WagmiProvider config={config}>
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
+      <TooltipProvider delayDuration={200}>
         <Toaster />
-        <Sonner />
         <BrowserRouter>
-          <div className="relative min-h-screen flex flex-col">
+          <div className="flex min-h-screen flex-col bg-background">
             <Navbar />
-            <div className="flex-1">
+            <main className="flex-1 pt-16">
               <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/portfolio" element={<Portfolio />} />
+                <Route path="/" element={<Home />} />
+                <Route path="/institution" element={<Institution />} />
+                <Route path="/trade" element={<Trade />} />
+                <Route path="/positions" element={<Positions />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </div>
+            </main>
             <Footer />
           </div>
         </BrowserRouter>
