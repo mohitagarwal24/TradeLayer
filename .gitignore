@@ -22,13 +22,23 @@ node_modules
 # cli
 dist
 
-# env
-packages/nextjs/.env
-backend/.env
-backend/.data/
+# env — never commit any populated env file
+.env
+.env.*
+!.env.example
+packages/nextjs/.env*
+backend/.env*
+packages/foundry/.env
+packages/ats/.env*
+cre/.env*
+!**/.env.example
+backend/.data*/
+**/.cre_build_tmp.js
 packages/nextjs/.vite
 # local agent tool permissions
 .claude/
 
 # personal learning/usage notes (stay on this machine only)
 docs/local/
+# regenerable: forge verify-contract --show-standard-json-input
+packages/foundry/verification/

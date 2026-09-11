@@ -67,9 +67,9 @@ verify:
 ats-lifecycle:
 	forge script script/AtsLifecycle.s.sol --rpc-url $(RPC_URL) --broadcast --ffi
 
-# Deploy to Hedera testnet (requires PRIVATE_KEY + ATS_DSTOCK in packages/foundry/.env)
+# Deploy to Hedera testnet (requires PRIVATE_KEY, ENCLAVE_SIGNER and ATS_F/ATS_TSLA/ATS_VOO in .env)
 deploy-hedera-testnet:
-	@if [ -z "$(PRIVATE_KEY)" ] && ! rg -q "^PRIVATE_KEY=0x" .env 2>/dev/null; then 		echo "Error: set PRIVATE_KEY in packages/foundry/.env first (yarn generate)"; 		exit 1; 	fi
+	@if [ -z "$(PRIVATE_KEY)" ] && ! grep -q "^PRIVATE_KEY=0x" .env 2>/dev/null; then 		echo "Error: set PRIVATE_KEY in packages/foundry/.env first (yarn generate)"; 		exit 1; 	fi
 	forge script script/Deploy.s.sol --rpc-url hederaTestnet --broadcast --ffi --slow
 	node scripts-js/generateTsAbis.js
 
