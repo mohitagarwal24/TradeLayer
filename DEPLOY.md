@@ -29,6 +29,16 @@ cre secrets create cre/secrets.yaml   # uploads to the Vault DON
 cd cre && cre workflow deploy ./tradelayer
 ```
 
+**All three write to the Workflow Registry, which on testnet lives on Ethereum Sepolia — not on
+Hedera.** So `CRE_ETH_PRIVATE_KEY` in `cre/.env` needs **Sepolia ETH**, and HBAR is no help. It is
+set to the Hedera deployer `0x2325D18B00f3911C5355a816d891fb59bCC1D8BC`; ~0.05 SepoliaETH covers
+all three transactions with room to spare. Faucets:
+[faucets.chain.link/sepolia](https://faucets.chain.link/sepolia) ·
+[sepoliafaucet.com](https://sepoliafaucet.com).
+
+This key is a deployment credential, not a workflow secret — it is never uploaded to the Vault DON
+and never reaches the enclave.
+
 These prerequisites are done; this records what they were.
 
 - **`authorizedKeys`.** An empty list is valid only in simulation — a deployed workflow rejects an
