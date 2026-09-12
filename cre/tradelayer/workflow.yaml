@@ -1,11 +1,11 @@
 # ==========================================================================
 # CRE WORKFLOW SETTINGS — TradeLayer confidential settlement
 # ==========================================================================
-# One workflow, four confidential handlers (all `handlerInTee`):
-#   trigger 0  H1 intake     HTTP  — opens a sealed order, places ONE broker order
-#   trigger 1  H2 reconcile  cron  — polls fills, signs atomic settlements
-#   trigger 2  H3 batch      cron  — nets fills per symbol across every institution
-#   trigger 3  H4 policy     HTTP  — opens an institution's sealed rulebook
+# One workflow, four confidential handlers (all `handlerInTee`) on three triggers:
+#   trigger 0  HTTP  — H1 intake (kind: order) and H4 policy (kind: policy). A deployed
+#                      workflow may register only one HTTP trigger, so onHttp routes on `kind`.
+#   trigger 1  cron  — H2 reconcile: polls fills, signs atomic settlements
+#   trigger 2  cron  — H3 batch: nets fills per symbol across every institution
 #
 # Hedera testnet is the only target. There is no local profile and no mock broker: the states
 # that matter (queued outside market hours, partial fills, rejections) only exist against the
@@ -14,6 +14,10 @@
 testnet-settings:
   user-workflow:
     workflow-name: "tradelayer"
+    # Chainlink-hosted registry, authorised by the CRE login session. Omitting this defaults to
+    # the public onchain Workflow Registry, which registers on Ethereum *mainnet* and wants real
+    # ETH for every deploy. Nothing here needs an onchain ownership record.
+    deployment-registry: "private"
   workflow-artifacts:
     workflow-path: "./main.ts"
     config-path: "./config/config.testnet.json"

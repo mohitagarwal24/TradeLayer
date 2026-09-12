@@ -62,9 +62,9 @@ services:
       - key: RELAY_AUTH_TOKEN
         sync: false
       - key: CRE_GATEWAY_URL
-        sync: false
+        value: https://01.gateway.zone-a.cre.chain.link
       - key: CRE_WORKFLOW_ID
-        sync: false
+        value: "0009ba3eb7bc81d5ecea0661b377cba10e823d9c3d3c933725b1049b2f62469e"
       - key: ALPACA_DATA_KEY_ID
         sync: false
       - key: ALPACA_DATA_SECRET
