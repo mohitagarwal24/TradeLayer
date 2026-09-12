@@ -179,23 +179,27 @@ camera.
 > The position is written back encrypted. Five USDC left the treasury; the firm now holds
 > 0.0136 of a Tesla share, and only this employee can read that."
 
-### 2:12 – 2:22 · What the chain shows, and what it doesn't — *tab 8*
-*Paste the transaction URL from `proofLinks.ts`. Scroll to the event log.*
+### 2:12 – 2:20 · What the chain shows, and what it doesn't — *tab 8*
+*Paste the **first** transaction URL from `proofLinks.ts` — that's the `openBuy`. Scroll to its
+event log.*
 
 > "Here's that order on Hedera. Everything public about it is an amount and a deadline. Not the
 > stock, not the share count, not the price, not who benefits."
 
 *Then the schedule link.*
 
-> "And the refund is already scheduled on-chain to fire at the deadline. If nothing fills, the
-> money goes back to the treasury on its own — no keeper, no operator, nobody to trust."
+> "And when that order opened, the contract scheduled **its own refund** on-chain for the deadline.
+> This one settled first, so it never needed it — but if nothing had filled, the money would have
+> gone back to the treasury on its own. No keeper, no operator, nobody to trust."
 
-### 2:22 – 2:28 · The same order at the broker — *tab 6*
+### 2:20 – 2:28 · The same order at the broker — *tab 6*
 *Search the `client_order_id` from `proofLinks.ts`.*
 
-> "The same order at Alpaca — placed for real, and still queued, because the market is closed.
-> That identifier is the first half of the on-chain order id, so you can carry an ID off the
-> blockchain straight into the broker and find the same trade."
+> "And here's that order at Alpaca — placed for real, and **still sitting queued**, because the
+> market is shut. That's exactly why the fill had to be simulated: the settlement machinery you
+> just watched is real, the one thing I supplied was the fill event. This identifier is the first
+> half of the on-chain order id, so you can carry an ID off the blockchain straight into the
+> broker and find the same trade."
 
 ### 2:28 – 2:30 · Close — *tab 7*
 
