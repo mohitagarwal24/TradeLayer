@@ -143,7 +143,7 @@ All five verified on HashScan (`exact_match`).
 | `OrgWalletRegistry` | [`0xa85a68C09d87189B562864C77BBBbc28110ae6D9`](https://hashscan.io/testnet/contract/0xa85a68C09d87189B562864C77BBBbc28110ae6D9) |
 | `ComplianceRouter` | [`0x6b7f8B75120f1F6CaeCc242581cAc99B07d05D3E`](https://hashscan.io/testnet/contract/0x6b7f8B75120f1F6CaeCc242581cAc99B07d05D3E) |
 | `OmnibusVault` | [`0xdF6852804c867068271df32a32114c62b322Fed3`](https://hashscan.io/testnet/contract/0xdF6852804c867068271df32a32114c62b322Fed3) |
-| `OrderEscrow` | [`0xA020804EBA73B6127fc84fAD6C74b69d1c818FF2`](https://hashscan.io/testnet/contract/0xA020804EBA73B6127fc84fAD6C74b69d1c818FF2) |
+| `OrderEscrow` | [`0x4F59e014AEDe86A5dcf2422a45cFf82a2fC5eda9`](https://hashscan.io/testnet/contract/0x4F59e014AEDe86A5dcf2422a45cFf82a2fC5eda9) |
 | `ConfidentialLedger` | [`0x458B9b009E291c5869E3d3d56709237a42e8d3b5`](https://hashscan.io/testnet/contract/0x458B9b009E291c5869E3d3d56709237a42e8d3b5) |
 | `FORD-t` · `TSLA-t` · `VOO-t` | ATS equities, 9 decimals — [`0x3ca9…24ed`](https://hashscan.io/testnet/contract/0x3ca9772d1030cb74fc0b639338241105577524ed) · [`0xd085…3249`](https://hashscan.io/testnet/contract/0xd085bdb088940ece20a7ccfc064deb2824433249) · [`0x4761…766a`](https://hashscan.io/testnet/contract/0x4761355322501c098d3b0dc9b9cbbfc2d77b766a) |
 | USDC | Circle native, HTS `0.0.429274` |
@@ -200,7 +200,13 @@ packages/ats/       ATS issuance and role wiring
 
 ## Run it
 
-Contracts are deployed and wired. See **[DEMO.md](DEMO.md)** for the full runbook.
+Contracts are deployed and wired, and the backend is hosted:
+
+```bash
+curl https://tradelayer-backend.onrender.com/health
+```
+
+Locally — see **[DEMO.md](DEMO.md)** for the full runbook, **[DEPLOY.md](DEPLOY.md)** for hosting:
 
 ```bash
 cd backend && npm start     # intake + relayer + chain narration — keep this on screen

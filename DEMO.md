@@ -205,7 +205,7 @@ byte-identical to the source). A judge can read the actual code, not just trust 
 | OrgWalletRegistry | `0xa85a68C09d87189B562864C77BBBbc28110ae6D9` |
 | ConfidentialLedger | `0x458B9b009E291c5869E3d3d56709237a42e8d3b5` |
 | OmnibusVault | `0xdF6852804c867068271df32a32114c62b322Fed3` |
-| OrderEscrow | `0xA020804EBA73B6127fc84fAD6C74b69d1c818FF2` |
+| OrderEscrow | `0x4F59e014AEDe86A5dcf2422a45cFf82a2fC5eda9` |
 | ComplianceRouter | `0x6b7f8B75120f1F6CaeCc242581cAc99B07d05D3E` |
 
 Real gas, real timestamps, a public explorer they can refresh live while you click — and a
