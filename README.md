@@ -122,7 +122,7 @@ Four handlers, all `handlerInTee` (nitro / us-west-2):
 | **H1 intake** | HTTP | opens the sealed intent, verifies the signature, resolves the institution **from the registry, never from the intent**, decrypts the portfolio and the private rules, places **one** broker order, signs `LedgerUpdate` |
 | **H2 reconcile** | cron 30 s | polls fills, signs one atomic `Settlement` — shares credited ⇔ escrow released |
 | **H3 batch** | cron 5 min | nets every fill per symbol across **all** institutions, signs `AtsMint` / `AtsBurn` |
-| **H4 policy** | HTTP | opens the admin's sealed rulebook, proves authorship against `OrgWalletRegistry`, re-encrypts it and signs `PolicyUpdate` |
+| **H4 policy** | HTTP (shares H1's trigger) | opens the admin's sealed rulebook, proves authorship against `OrgWalletRegistry`, re-encrypts it and signs `PolicyUpdate` |
 
 Sensitive inputs processed only inside the TEE: the sealed order, the sealed rulebook, both
 encrypted ledgers, and the Vault DON secrets. Nothing in `handlers.ts` logs a symbol, quantity,

@@ -29,11 +29,18 @@ cre secrets create cre/secrets.yaml   # uploads to the Vault DON
 cd cre && cre workflow deploy ./tradelayer
 ```
 
-Two things must be true before this works:
+These prerequisites are done; this records what they were.
 
-- **`authorizedKeys` on both HTTP triggers.** They are `[]` today, which is only valid for local
-  simulation — a deployed workflow rejects unauthorised HTTP triggers. The intake API signs its
-  requests, so its address goes in the list.
+- **`authorizedKeys`.** An empty list is valid only in simulation — a deployed workflow rejects an
+  unauthorised HTTP trigger. `config.testnet.json` now lists the backend's address
+  (`0xC350…55AD`), and `backend/src/creGateway.ts` signs each request with the matching key. The
+  key defaults to `RELAYER_PRIVATE_KEY`, so no new secret is needed; set `GATEWAY_SIGNING_KEY` if
+  you would rather the trigger identity could not also spend gas.
+- **One HTTP trigger, not two.** We registered two (H1 intake, H4 policy). A deployed workflow
+  supports only one — "there is currently no mechanism to route requests to different HTTP trigger
+  handlers within the same workflow" — so they now share trigger 0 and `onHttp` branches on the
+  payload's `kind`, which is the documented pattern. Simulation runs two happily, so this was
+  invisible until deployment.
 - **`relayerUrl` must be publicly reachable.** A DON-hosted enclave cannot POST to `localhost`.
   Done — `config.testnet.json` points at the Render service. Note this also means a local
   `cre workflow simulate` now relays through the hosted backend, so the hosted relayer key is the

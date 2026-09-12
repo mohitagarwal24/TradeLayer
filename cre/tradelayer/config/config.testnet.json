@@ -22,5 +22,8 @@
   "policy": {
     "minExpiryWindowSeconds": 600,
     "maxOpenOrdersPerTick": 20
-  }
+  },
+  "authorizedKeys": [
+    "0xC350C8c74d2DEF61998441EF94fFC5007d6C55AD"
+  ]
 }
