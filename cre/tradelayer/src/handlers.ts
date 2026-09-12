@@ -340,7 +340,14 @@ export function onReconcile(runtime: TeeRuntime<Config>, _payload: CronPayload):
         openOrders: nextOpen,
       };
       const blobs = encodePortfolio(aKey, next, entry.version + 1n, fromHex(orderId));
+      // The settlement is the one moment shares and cash move together; narrate it, or the only
+      // sign it happened is a chain event several seconds later.
+      runtime.log(
+        `H2 ${short}: filled ${broker.filledQty} ${open.symbol} @ $${broker.filledAvgPrice} — ` +
+          `settling $${dollars(spent)} atomically: shares credited ⇔ escrow released`,
+      );
       const result = relay(runtime, cfg.relayerUrl, authorizeSettlement(s, orderId, spent, blobs.enclaveBlob, blobs.userBlob, entry.version), secrets.relayToken);
+      runtime.log(`H2 ${short}: settlement ${result.status}; encrypted position now v${entry.version + 1n}`);
       summary.push({ orderId: short, action: "settle", relay: result.status });
       // Supply is deliberately NOT moved here. Minting per fill would let an observer line up a
       // supply change with one escrow release; H3 nets every fill across every institution
