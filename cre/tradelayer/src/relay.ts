@@ -126,8 +126,16 @@ export function authorizeAtsDelta(
 
 export type RelayResult = { status: string; txHash?: string; error?: string };
 
-export function relay<C>(runtime: AnyRuntime<C>, relayerUrl: string, auth: Authorization): RelayResult {
-  const res = request(runtime, { url: relayerUrl, method: "POST", body: auth });
+export function relay<C>(runtime: AnyRuntime<C>, relayerUrl: string, auth: Authorization, token?: string): RelayResult {
+  const res = request(runtime, {
+    url: relayerUrl,
+    method: "POST",
+    body: auth,
+    // The relayer is publicly reachable once hosted and every call it accepts costs HBAR. This
+    // does not replace the on-chain signature check — a forged authorization still dies at the
+    // contract — it just stops a passer-by burning the relayer's gas on rejections.
+    ...(token ? { headers: { "x-tradelayer-relay-token": token } } : {}),
+  });
   const body = (() => {
     try {
       return res.json() as RelayResult;
