@@ -15,6 +15,9 @@ export const ORDER_ESCROW_ABI = [
   "event OrderSettled(bytes32 indexed orderId, uint256 spent, uint256 returned, bytes32 digest)",
   "event OrderCancelled(bytes32 indexed orderId, uint256 returned, bytes32 digest)",
   "event OrderRefunded(bytes32 indexed orderId, uint256 returned)",
+  // If HIP-1215 scheduling fails at openBuy the self-refund will never fire, and silence
+  // would leave "no keeper involved" quietly untrue.
+  "event ScheduleFailed(bytes32 indexed orderId, int64 responseCode)",
 ] as const;
 
 export const CONFIDENTIAL_LEDGER_ABI = [
@@ -25,6 +28,10 @@ export const CONFIDENTIAL_LEDGER_ABI = [
   "function policy(bytes32 orgId) view returns (tuple(bytes blob, uint64 version))",
   "function enclaveSigner() view returns (address)",
   "function usedDigest(bytes32) view returns (bool)",
+  // Narrated: these two are the on-chain proof of the central privacy claim — a version ticking
+  // and a hash, with the contents nowhere in sight.
+  "event EntryUpdated(bytes32 indexed accountId, uint64 indexed version, bytes32 blobHash, bytes32 digest)",
+  "event PolicyUpdated(bytes32 indexed orgId, uint64 indexed version, bytes32 digest)",
 ] as const;
 
 export const OMNIBUS_VAULT_ABI = [

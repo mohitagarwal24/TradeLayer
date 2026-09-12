@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { useAccount, useSignMessage } from "wagmi";
-import { toast } from "sonner";
 import { PORTFOLIO_KEY_MESSAGE, portfolioKeyFromSignature, type Hex } from "@/lib/seal";
 
 /**
@@ -32,7 +31,6 @@ export function usePortfolioKey() {
     const signature = await signMessageAsync({ account: address, message: PORTFOLIO_KEY_MESSAGE });
     const key = portfolioKeyFromSignature(signature as Hex);
     store.set(address, key.privateKey, key.publicKey);
-    toast.success("Portfolio key derived", { description: "Held in memory for this session only." });
     return key;
   }
 

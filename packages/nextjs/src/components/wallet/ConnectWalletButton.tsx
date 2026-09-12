@@ -66,9 +66,8 @@ export function ConnectWalletButton() {
           <DropdownMenuLabel className="font-mono text-xs">{shortenAddress(address)}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <div className="px-2 py-1.5 text-xs text-muted-foreground">
-            Network:{" "}
             <span className={connectedChain ? "text-success" : "text-destructive font-medium"}>
-              {connectedChain ? connectedChain.name : `unsupported (chain ${chainId ?? "?"})`}
+              {connectedChain ? connectedChain.name : "Wrong network — switch to Hedera Testnet"}
             </span>
           </div>
           <DropdownMenuSeparator />

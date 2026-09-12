@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { readable } from "@/lib/errors";
 import { Navigate } from "react-router-dom";
 import { useAccount } from "wagmi";
 import { toast } from "sonner";
@@ -33,6 +34,7 @@ export default function Trade() {
   const [orderId, setOrderId] = useState<Hex | null>(null);
   const [stage, setStage] = useState<Stage>("received");
   const [declined, setDeclined] = useState<string | undefined>();
+  const [slow, setSlow] = useState(false);
 
   const symbols = useMemo(() => deployment?.symbols ?? [], [deployment?.symbols]);
   useEffect(() => {
@@ -45,8 +47,13 @@ export default function Trade() {
   const estimatedShares = price !== undefined && spend !== undefined && price > 0 ? spend / price : undefined;
 
   // Poll the order until it leaves OPEN, translating chain status into something readable.
+  //
+  // The enclave takes roughly 20-30s, during which the only honest thing to say is "still
+  // working". Past that we say so explicitly rather than spinning silently, because a spinner
+  // that never resolves reads as a broken app.
   useEffect(() => {
     if (!orderId) return;
+    const startedAt = Date.now();
     const tick = async () => {
       try {
         const res = await fetch(`${BACKEND_API}/orders/${orderId}`).then(r => r.json());
@@ -58,7 +65,11 @@ export default function Trade() {
         } else if (status === "REFUNDED") {
           setStage("declined");
           setDeclined("The order expired before it could fill.");
-        } else if (res.triggers?.length) setStage(clock?.isOpen === false ? "placed" : "placed");
+        } else if (res.triggers?.some((t: { ok: boolean }) => t.ok)) {
+          // The enclave ran and accepted it: the order is with the broker now.
+          setStage("placed");
+        }
+        setSlow(Date.now() - startedAt > 12_000);
       } catch {
         /* keep the last state */
       }
@@ -66,7 +77,7 @@ export default function Trade() {
     void tick();
     const t = setInterval(tick, 5_000);
     return () => clearInterval(t);
-  }, [orderId, clock?.isOpen]);
+  }, [orderId]);
 
   if (!isConnected) return <Navigate to="/" replace />;
   if (loading) return <div className="container mx-auto px-4 py-16 text-sm text-muted-foreground">Loading…</div>;
@@ -122,18 +133,19 @@ export default function Trade() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ orderId: id, envelope }),
       });
-      if (!res.ok) throw new Error(`the service rejected the order (${res.status})`);
-      toast.success("Order placed", { description: "The chain shows an amount and a deadline. Nothing else." });
+      if (!res.ok) throw new Error("The trading service turned the order down. Nothing was spent.");
+      toast.success("Order placed", { description: "Publicly this is an amount and a deadline. Nothing else." });
     } catch (error) {
       setOrderId(null);
-      toast.error("Order not placed", { description: ((error as Error).message ?? "").slice(0, 180) });
+      setSlow(false);
+      toast.error("Order not placed", { description: readable(error) });
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="container mx-auto max-w-xl space-y-5 px-4 py-10">
+    <div className="container mx-auto max-w-3xl space-y-5 px-4 py-10">
       {clock?.isOpen === false && (
         <div className="rounded-lg border border-border/60 bg-secondary/40 p-3 text-xs text-muted-foreground">
           The US market is closed. Orders are still placed for real — the broker queues them and they
@@ -164,7 +176,11 @@ export default function Trade() {
                 <div className="font-heading text-sm font-semibold">{s}</div>
                 <div className="truncate text-xs text-muted-foreground">{SYMBOL_NAMES[s] ?? "Equity"}</div>
                 <div className="mt-1 text-xs tabular-nums text-muted-foreground">
-                  {market?.prices?.[s] ? money(market.prices[s].price) : "—"}
+                  {market?.prices?.[s] ? (
+                    money(market.prices[s].price)
+                  ) : (
+                    <span className="inline-block h-3 w-12 animate-pulse rounded bg-muted align-middle" />
+                  )}
                 </div>
               </button>
             ))}
@@ -181,7 +197,7 @@ export default function Trade() {
           <div className="flex items-center justify-between rounded-lg border border-border/60 p-3 text-sm">
             <span className="text-muted-foreground">Roughly</span>
             <span className="font-heading font-semibold tabular-nums">
-              {estimatedShares !== undefined ? `${estimatedShares.toFixed(6)} ${symbol}` : "—"}
+              {estimatedShares !== undefined ? `${estimatedShares.toFixed(4)} ${symbol}` : "at the market price"}
             </span>
           </div>
 
@@ -204,7 +220,7 @@ export default function Trade() {
             <CardTitle className="font-heading text-base">Progress</CardTitle>
           </CardHeader>
           <CardContent>
-            <OrderProgress stage={stage} declinedReason={declined} queued={clock?.isOpen === false} />
+            <OrderProgress stage={stage} declinedReason={declined} queued={clock?.isOpen === false} slow={slow} />
           </CardContent>
         </Card>
       )}

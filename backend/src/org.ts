@@ -50,6 +50,7 @@ export async function walletStatusHandler(req: Request, res: Response) {
       isAdmin: bound && admin !== null && getAddress(admin) === address,
     });
   } catch (error) {
+    log("warn", "wallet lookup failed — the web app will show an error", { reason: (error as Error).message.slice(0, 100) });
     res.status(502).json({ error: (error as Error).message });
   }
 }
@@ -87,6 +88,7 @@ export async function orgStatusHandler(req: Request, res: Response) {
       openOrders: Number(openCount),
     });
   } catch (error) {
+    log("warn", "institution lookup failed — the web app will show an error", { reason: (error as Error).message.slice(0, 100) });
     res.status(502).json({ error: (error as Error).message });
   }
 }
@@ -106,6 +108,7 @@ export async function complianceStatusHandler(req: Request, res: Response) {
     }
     res.json({ address: getAddress(raw), admitted: out });
   } catch (error) {
+    log("warn", "compliance lookup failed — the web app will show an error", { reason: (error as Error).message.slice(0, 100) });
     res.status(502).json({ error: (error as Error).message });
   }
 }
@@ -147,11 +150,21 @@ export async function marketClockHandler(_req: Request, res: Response) {
       headers: { "APCA-API-KEY-ID": keyId, "APCA-API-SECRET-KEY": secret },
     });
     if (!r.ok) {
+      log("warn", "market clock unavailable — the UI cannot say whether the market is open", { status: r.status });
       res.json({ isOpen: null });
       return;
     }
-    res.json(await r.json());
-  } catch {
+    // Alpaca answers in snake_case. Forwarding it raw is what silently broke the closed-market
+    // banner: the UI reads `isOpen`, so `is_open: false` arrived as `undefined` and the "queued
+    // until the market opens" state never rendered — it read as a stalled order instead.
+    const clock = (await r.json()) as { is_open?: boolean; next_open?: string; next_close?: string };
+    res.json({
+      isOpen: clock.is_open ?? null,
+      nextOpen: clock.next_open,
+      nextClose: clock.next_close,
+    });
+  } catch (error) {
+    log("warn", "market clock unavailable", { reason: (error as Error).message.slice(0, 80) });
     res.json({ isOpen: null });
   }
 }

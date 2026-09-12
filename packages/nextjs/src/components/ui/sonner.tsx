@@ -1,14 +1,16 @@
-import { useTheme } from "next-themes";
 import { Toaster as Sonner, toast } from "sonner";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
+/**
+ * The app ships a single dark palette (`index.html` hardcodes `class="dark"`), and no
+ * ThemeProvider is mounted — so asking next-themes for the theme returned "system" and rendered
+ * light toasts over a near-black page on any machine whose OS was in light mode.
+ */
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme();
-
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme="dark"
       className="toaster group"
       toastOptions={{
         classNames: {

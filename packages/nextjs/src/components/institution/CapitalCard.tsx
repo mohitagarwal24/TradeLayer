@@ -65,9 +65,9 @@ export function CapitalCard({ onFunded }: { onFunded: () => void }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <Figure label="Your USDC" value={`${usd(balance as bigint | undefined)}`} />
-          <Figure label="Ready to trade" value={`${usd(available as bigint | undefined)}`} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Figure label="In your wallet" value={`${usd(balance as bigint | undefined)}`} />
+          <Figure label="Not committed to an order" value={`${usd(available as bigint | undefined)}`} />
         </div>
         <div className="flex gap-2">
           <Input value={amount} onChange={e => setAmount(e.target.value)} inputMode="decimal" aria-label="Amount in USDC" />
@@ -78,18 +78,23 @@ export function CapitalCard({ onFunded }: { onFunded: () => void }) {
         </div>
         <p className="text-xs text-muted-foreground">
           Your people never hold this money. When someone places an order the treasury funds it
-          directly, and whatever isn't spent comes straight back.
+          directly, and whatever isn't spent comes straight back. The second figure is the whole
+          platform's uncommitted reserve — deliberately, no per-firm balance is public.
         </p>
       </CardContent>
     </Card>
   );
 }
 
+/** A headline number, or a placeholder that reads as "loading" rather than as "broken". */
 function Figure({ label, value }: { label: string; value: string }) {
+  const pending = value === "—";
   return (
     <div className="rounded-lg border border-border/60 p-3">
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-0.5 font-heading text-xl font-semibold tabular-nums">{value}</div>
+      <div className="mt-0.5 font-heading text-xl font-semibold tabular-nums">
+        {pending ? <span className="inline-block h-6 w-24 animate-pulse rounded bg-muted align-middle" /> : value}
+      </div>
     </div>
   );
 }

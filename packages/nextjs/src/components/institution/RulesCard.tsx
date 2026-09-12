@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { readable } from "@/lib/errors";
 import { useAccount } from "wagmi";
 import { toast } from "sonner";
 import { Loader2, Lock, Plus, X } from "lucide-react";
@@ -18,18 +19,33 @@ const blank = (): Draft => ({ address: "", canTrade: true, restricted: [] });
 
 /**
  * The institution's private rulebook — who may trade, how much per order, and what they may not
- * touch. These rules never appear on-chain in the clear: they are sealed in this browser and can
- * only be opened inside the enclave, which checks every order against them before it reaches the
- * market. The chain stores ciphertext and a version number.
+ * touch. These rules never appear on-chain in the clear: they are sealed in this browser and
+ * opened only where orders are checked against them. The chain stores ciphertext and a version.
+ *
+ * Write-only by construction. The published blob is encrypted under a key derived from the ledger
+ * master key, which this browser does not have — so not even the admin who wrote the rules can
+ * read them back out of the chain. Publishing replaces the whole rulebook rather than editing it.
+ * The draft below is remembered locally only as a convenience, so the form is not blank every
+ * time; it is this browser's copy, not the source of truth.
  */
 export function RulesCard({ membership }: { membership: Membership }) {
   const { address } = useAccount();
   const { deployment } = useDeployment();
   const wallet = useWalletWrite();
 
+  const draftKey = `tradelayer.rules.${membership.org ?? "none"}`;
+  const saved = (() => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      return raw ? (JSON.parse(raw) as { maxOrder: string; rules: Draft[] }) : null;
+    } catch {
+      return null;
+    }
+  })();
+
   const [version, setVersion] = useState<number | null>(null);
-  const [maxOrder, setMaxOrder] = useState("100");
-  const [rules, setRules] = useState<Draft[]>([blank()]);
+  const [maxOrder, setMaxOrder] = useState(saved?.maxOrder ?? "100");
+  const [rules, setRules] = useState<Draft[]>(saved?.rules?.length ? saved.rules : [blank()]);
   const [busy, setBusy] = useState(false);
 
   const symbols = deployment?.symbols ?? [];
@@ -86,12 +102,20 @@ export function RulesCard({ membership }: { membership: Membership }) {
         body: JSON.stringify({ orgId: membership.org, envelope }),
       });
       const body = (await res.json()) as { applied?: boolean; note?: string };
-      if (!res.ok || !body.applied) throw new Error(body.note?.slice(-180) ?? `service returned ${res.status}`);
+      // The transcript tail is a developer artefact; the user needs to know it did not apply.
+      if (!res.ok || !body.applied) throw new Error("The rules were not accepted. Nothing changed.");
 
-      toast.success("Rules published", { description: "Stored encrypted. Only the enclave can read them." });
+      // Keep this browser's copy so the form is not blank next time. The chain holds the truth,
+      // encrypted, and cannot be read back to repopulate it.
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({ maxOrder, rules }));
+      } catch {
+        /* private browsing, quota, or blocked storage — the rules still published */
+      }
+      toast.success("Rules published", { description: "Stored encrypted. Checked on every order." });
       await loadVersion();
     } catch (error) {
-      toast.error("Couldn't publish the rules", { description: ((error as Error).message ?? "").slice(0, 180) });
+      toast.error("Couldn't publish the rules", { description: readable(error) });
     } finally {
       setBusy(false);
     }
@@ -104,20 +128,18 @@ export function RulesCard({ membership }: { membership: Membership }) {
           <span className="flex items-center gap-2">
             <Lock className="h-4 w-4 text-primary" /> Trading rules
           </span>
-          {version !== null && (
-            <Badge variant="secondary">{version === 0 ? "none set" : `version ${version}`}</Badge>
-          )}
+          {version !== null && version === 0 && <Badge variant="secondary">none set</Badge>}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-xs text-muted-foreground">
-          Sealed in your browser and readable only inside the enclave — every order is checked
-          against them before it reaches the market.
+          Encrypted in your browser before they leave it. Every order is checked against them
+          before it reaches the market, and they cannot be read back — not by us, not by you.
           {version === 0 && " Until you publish rules, any member may trade freely."}
         </p>
 
         <label className="flex items-center gap-2 text-sm">
-          <span className="whitespace-nowrap text-muted-foreground">Most one order may spend</span>
+          <span className="whitespace-nowrap text-muted-foreground">Limit per order</span>
           <Input value={maxOrder} onChange={e => setMaxOrder(e.target.value)} inputMode="decimal" className="max-w-[120px]" />
           <span className="text-muted-foreground">USDC</span>
         </label>
