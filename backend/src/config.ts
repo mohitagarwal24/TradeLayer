@@ -79,5 +79,11 @@ export const config = {
     /// The local relayer is plain http; the simulator refuses that without this.
     allowInsecureRpc: optional("CRE_ALLOW_INSECURE_RPC", "true") === "true",
     gatewayUrl: optional("CRE_GATEWAY_URL", ""),
+    /// 64-hex workflow id printed by `cre workflow deploy`. The gateway routes on this.
+    workflowId: optional("CRE_WORKFLOW_ID", "").replace(/^0x/, ""),
+    /// Key that signs the gateway JWT. Its address must appear in the workflow's
+    /// `authorizedKeys`. Defaults to the relayer key so a deployment needs no extra secret;
+    /// set it separately if you would rather the trigger identity could not also spend gas.
+    gatewaySigningKey: optional("GATEWAY_SIGNING_KEY", "") || optional("RELAYER_PRIVATE_KEY", ""),
   },
 } as const;

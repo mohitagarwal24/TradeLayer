@@ -19,6 +19,11 @@ export const configSchema = z.object({
     symbols: z.record(z.string(), address),
   }),
   relayerUrl: url,
+  /** EVM addresses permitted to pull the HTTP trigger on a *deployed* workflow. The gateway
+   * verifies a JWT signed by one of these before the enclave ever runs, so this is what stops a
+   * passer-by making the enclave place broker orders. An empty list is valid only in simulation;
+   * `cre workflow deploy` rejects it. */
+  authorizedKeys: z.array(address),
   /** Real broker only. There is deliberately no mock: a settlement the demo fabricates is not a
    * settlement, and the failure modes that matter (market closed, partial fill, rejection) only
    * appear against the live API. */

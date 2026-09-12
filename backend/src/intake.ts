@@ -7,6 +7,7 @@ import { config } from "./config";
 import { escrow, ledger } from "./hedera";
 import { OrderStatus } from "./abis";
 import { toBytes32 } from "./eip712";
+import { execute } from "./creGateway";
 import { log, short } from "./log";
 
 /**
@@ -42,8 +43,12 @@ fs.mkdirSync(policyDir, { recursive: true });
 
 type StoredEnvelope = Envelope & { receivedAt: number; triggers: Array<{ at: number; mode: string; ok: boolean; note?: string }> };
 
-/** One sealed thing to hand the enclave. `triggerIndex` selects the handler registered in
- * cre/tradelayer/main.ts — 0 is H1 intake, 3 is H4 policy. */
+/** One sealed thing to hand the enclave.
+ *
+ * `triggerIndex` selects the handler registered in cre/tradelayer/main.ts. H1 and H4 now share
+ * trigger 0 — a deployed workflow may register only one HTTP trigger — and the enclave branches
+ * on `payload.kind`. The index still matters for `simulate`, which addresses handlers by number;
+ * the gateway has no such concept and routes purely on the payload. */
 type SealedJob = { id: string; dir: string; triggerIndex: number; label: string; payload: unknown };
 
 function envelopePath(orderId: string) {
@@ -115,15 +120,9 @@ async function triggerSimulate(job: SealedJob): Promise<{ ok: boolean; note: str
 }
 
 async function triggerGateway(job: SealedJob): Promise<{ ok: boolean; note: string }> {
-  if (!config.trigger.gatewayUrl) return { ok: false, note: "CRE_GATEWAY_URL not set" };
-  // Live CRE HTTP trigger: the request must be signed by an authorized key configured on the
-  // workflow. Wire the JWT here when the workflow is deployed; simulation is the demo path.
-  const res = await fetch(config.trigger.gatewayUrl, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(job.payload),
-  });
-  return { ok: res.ok, note: `gateway ${res.status}` };
+  const result = await execute(job.payload, job.label);
+  if (!result.ok) log("warn", `${job.label} was not accepted by the gateway`, { reason: result.note.slice(0, 160) });
+  return { ok: result.ok, note: result.note };
 }
 
 async function runJob(job: SealedJob) {
@@ -139,9 +138,9 @@ async function trigger(stored: StoredEnvelope) {
   const result = await runJob({
     id: stored.orderId,
     dir: envelopeDir,
-    triggerIndex: 0, // H1 intake is the first handler registered
+    triggerIndex: 0, // the one HTTP trigger; `kind` selects the handler inside it
     label: "H1",
-    payload: { orderId: stored.orderId, envelope: stored.envelope },
+    payload: { kind: "order", orderId: stored.orderId, envelope: stored.envelope },
   });
   stored.triggers.push({ at: Date.now(), mode: config.trigger.mode, ok: result.ok, note: result.note.slice(0, 2_000) });
   writeEnvelope(stored);
@@ -237,9 +236,9 @@ export async function submitPolicyHandler(req: Request, res: Response) {
   const result = await runJob({
     id: orgId,
     dir: policyDir,
-    triggerIndex: 3, // H4 policy — registered last so H1/H2/H3 indices stay put
+    triggerIndex: 0, // same HTTP trigger as H1; `kind` selects the handler inside it
     label: "H4",
-    payload: { orgId, envelope },
+    payload: { kind: "policy", orgId, envelope },
   });
   stored.triggers.push({ at: Date.now(), mode: config.trigger.mode, ok: result.ok, note: result.note.slice(0, 2_000) });
   fs.writeFileSync(policyPath(orgId), JSON.stringify(stored, null, 2), { mode: 0o600 });

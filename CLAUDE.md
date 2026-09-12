@@ -89,15 +89,18 @@ non-interactive PATH.
 
 ## The four enclave handlers
 
-Registered in `cre/tradelayer/main.ts`; the trigger index matters because the backend spawns them
-by number.
+Registered in `cre/tradelayer/main.ts`. H1 and H4 **share trigger 0**: a deployed workflow may
+register only one HTTP trigger ("no mechanism to route requests to different HTTP trigger handlers
+within the same workflow"), so `onHttp` branches on the payload's `kind`. Simulation happily runs
+two, which is why this only surfaces at deploy time. The index still matters for `simulate`, which
+addresses handlers by number; the gateway has no such concept.
 
 | | Trigger | Inside the enclave |
 |---|---|---|
-| H1 intake | HTTP, **index 0** | opens the sealed intent, verifies the signature, **takes the institution from `order.orgId`** (see below), decrypts portfolio + rules, places one broker order, signs `LedgerUpdate` |
+| H1 intake | HTTP **0**, `kind: "order"` | opens the sealed intent, verifies the signature, **takes the institution from `order.orgId`** (see below), decrypts portfolio + rules, places one broker order, signs `LedgerUpdate` |
 | H2 reconcile | cron, index 1 | polls fills, signs one atomic `Settlement`. `pending:*` outside market hours is expected, not a failure |
 | H3 batch | cron, index 2 | nets fills per symbol across **every** institution, signs `AtsMint`/`AtsBurn` |
-| H4 policy | HTTP, **index 3** | opens the admin's sealed rulebook, proves authorship against `registry.adminOf`, re-encrypts under `orgKey`, signs `PolicyUpdate` |
+| H4 policy | HTTP **0**, `kind: "policy"` | opens the admin's sealed rulebook, proves authorship against `registry.adminOf`, re-encrypts under `orgKey`, signs `PolicyUpdate` |
 
 **Never trust `intent.orgId`.** It is user-supplied. H1 compares it against `order.orgId`, which
 the escrow resolved from the registry at open time, and rejects a mismatch. Trusting the intent
@@ -119,6 +122,12 @@ treated as rules that passed.
   order signature can never be replayed as a policy.
 - **Authorization payloads**: `cre/tradelayer/src/relay.ts` ⇄ `backend/src/eip712.ts` ⇄
   `backend/src/relayer.ts` `buildCall`.
+- **HTTP payloads**: `backend/src/intake.ts` sets `kind` ⇄ `cre/tradelayer/src/handlers.ts`
+  `onHttp` routes on it. Adding a third HTTP-driven handler means another `kind`, not another
+  trigger.
+- **Gateway JWT**: `backend/src/creGateway.ts` ⇄ the address in `config.testnet.json`
+  `authorizedKeys`. `npx tsx scripts/checkGatewayJwt.ts` pins the wire format — the gateway
+  rejects every mistake identically, as "unauthorized".
 - **ABIs**: `backend/src/abis.ts`, `cre/tradelayer/src/hedera.ts` and
   `packages/nextjs/src/lib/tradelayer.ts` are hand-written minimal ABIs. The frontend gets contract
   **addresses** from the backend's `/health` at runtime — there is no generated address file to

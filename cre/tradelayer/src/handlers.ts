@@ -109,6 +109,49 @@ export type BatchResult = {
   deltas?: Array<{ symbol: string; delta: string; relay?: string; note?: string }>;
 };
 
+/** What trigger 0 returns, whichever handler ran. One concrete type rather than a union: the
+ * SDK binds a single output type per handler. `handler` says which branch answered. */
+export type HttpResult = {
+  handler: "H1" | "H4";
+  status: "PLACED" | "REJECTED" | "IGNORED" | "APPLIED";
+  orderId?: Hex;
+  orgId?: string;
+  reason?: string;
+  relay?: string;
+  txHash?: string;
+  version?: string;
+};
+
+/**
+ * The single HTTP entry point.
+ *
+ * A deployed workflow may register only **one** HTTP trigger: "There is currently no mechanism to
+ * route requests to different HTTP trigger handlers within the same workflow." So the two
+ * HTTP-driven handlers share one trigger and branch on the payload, which is the documented
+ * pattern. Simulation would happily run two, which is exactly why this was not caught earlier.
+ *
+ * `kind` is explicit. Where it is absent the shape decides, but only when it is unambiguous — a
+ * body carrying both `orderId` and `orgId` is refused rather than guessed at, because silently
+ * resolving an order as a policy (or the reverse) would send it to the wrong signing path.
+ */
+export function onHttp(runtime: TeeRuntime<Config>, payload: HTTPPayload): HttpResult {
+  const body = JSON.parse(new TextDecoder().decode(payload.input)) as {
+    kind?: string;
+    orderId?: string;
+    orgId?: string;
+  };
+
+  if (body.kind === "order") return { handler: "H1", ...onIntake(runtime, payload) };
+  if (body.kind === "policy") return { handler: "H4", ...onPolicy(runtime, payload) };
+  if (body.kind !== undefined) throw new Error(`unknown http payload kind: ${body.kind}`);
+
+  const hasOrder = typeof body.orderId === "string";
+  const hasOrg = typeof body.orgId === "string";
+  if (hasOrder && !hasOrg) return { handler: "H1", ...onIntake(runtime, payload) };
+  if (hasOrg && !hasOrder) return { handler: "H4", ...onPolicy(runtime, payload) };
+  throw new Error("http payload must carry kind: 'order' | 'policy'");
+}
+
 export function onIntake(runtime: TeeRuntime<Config>, payload: HTTPPayload): IntakeResult {
   const cfg = runtime.config;
   const body = JSON.parse(new TextDecoder().decode(payload.input)) as IntakePayload;
