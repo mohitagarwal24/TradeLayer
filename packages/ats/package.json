@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "issue-equity": "tsx src/issueEquity.ts",
-    "configure-tradelayer": "tsx src/configureTradeLayer.ts",
-    "lifecycle": "tsx src/lifecycleDemo.ts",
-    "check-types": "tsc --noEmit"
+    "setup-hedera": "tsx src/setupHedera.ts",
+    "check-types": "tsc --noEmit",
+    "grant-router-roles": "tsx src/grantRouterRoles.ts"
   },
   "dependencies": {
     "@hashgraph/asset-tokenization-sdk": "^8.0.0",

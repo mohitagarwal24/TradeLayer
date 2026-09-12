@@ -17,7 +17,7 @@
     "deploy": "yarn foundry:deploy",
     "deploy:hedera-testnet": "yarn workspace @se-2/foundry deploy-hedera-testnet",
     "ats:issue": "yarn workspace @tradelayer/ats issue-equity",
-    "ats:lifecycle": "yarn workspace @tradelayer/ats lifecycle",
+    "ats:setup-hedera": "yarn workspace @tradelayer/ats setup-hedera",
     "flatten": "yarn foundry:flatten",
     "fork": "yarn foundry:fork",
     "format": "yarn foundry:format",
@@ -45,7 +45,8 @@
     "precommit": "lint-staged",
     "start": "yarn workspace @tradelayer/frontend dev",
     "test": "yarn foundry:test",
-    "verify": "yarn foundry:verify"
+    "verify": "yarn foundry:verify",
+    "ats:grant-router-roles": "yarn workspace @tradelayer/ats grant-router-roles"
   },
   "devDependencies": {
     "husky": "~9.1.6",

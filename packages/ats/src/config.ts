@@ -27,6 +27,8 @@ export const ATS_SECURITY_ABI = [
   "function setAddressFrozen(address account, bool frozen)",
   "function isFrozen(address account) view returns (bool)",
   "function grantRole(bytes32 role, address account) returns (bool)",
+  "function isIssuer(address issuer) view returns (bool)",
+  "function addIssuer(address issuer) returns (bool)",
   "function hasRole(bytes32 role, address account) view returns (bool)",
   "function setNominalValue(uint256 nominalValue, uint8 nominalValueDecimals)",
   "function getNominalValue() view returns (uint256)",
@@ -46,4 +48,6 @@ export const ATS_ROLES = {
   FREEZE_MANAGER: "0x71ae38482e1ab1c28e767d64766d686215b490c8c1bd7dfe6b101525187c2155",
   CONTROL_LIST: "0x6ed9a91e996c6475ecdc28ecbdbe9bd1122fc62b30cdbe6da8271884b51ec74d",
   NOMINAL_VALUE: "0xebf9ab6852aef7bc1e4068a64bd360845c54d5d95d4fed9fd47c52bbe7c15b8b",
+  /** Required to add an address to the diamond's SSI issuer list — see `grantKyc`'s `issuer` arg. */
+  SSI_MANAGER: "0x3120494a82251fe85b0403877539486dbfcf0f94c20741a3229cfad31f625ee1",
 } as const;
