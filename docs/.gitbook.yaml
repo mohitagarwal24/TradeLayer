@@ -1,0 +1,7 @@
+# Space-level configuration, relative to this directory (the space's mapped
+# content root). `root: ./` because this file already sits inside docs/.
+root: ./
+
+structure:
+  readme: README.md
+  summary: SUMMARY.md

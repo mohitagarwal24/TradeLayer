@@ -1,0 +1,17 @@
+# Site-level configuration. GitBook looks for this at the root of the site's
+# project directory — the "Project directory" field in Git Sync, here `./`.
+#
+# This file names the site and maps repository directories onto its navigation.
+# The per-space settings (which file is the readme, which is the nav) live in
+# a separate `.gitbook.yaml` inside the space's own directory — see docs/.gitbook.yaml.
+$schema: https://api.gitbook.com/gitbook-docs.yaml
+site:
+  title: TradeLayer
+  structure:
+    - type: space
+      key: space-docs
+      title: Documentation
+      path: /
+      default: true
+      content:
+        directory: ./docs
