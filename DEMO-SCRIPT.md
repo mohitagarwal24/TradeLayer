@@ -52,6 +52,17 @@ take, sped up.
 
 **Never double-click a write.** One relayer key, no nonce queue.
 
+> ### ⚠ Registration is one-shot, and it burns the wallet — not just the name
+>
+> `registerOrg` binds the caller permanently, and `revokeMembership` explicitly refuses to remove
+> an admin. So the moment `0x50C6…A9Cd` registers **any** institution, it can never register
+> another — a different name will not rescue you.
+>
+> **Do not rehearse the registration step with this wallet.** Either rehearse everything from
+> "Ask to join" onwards (register for real, once, at the start of your first take), or make a
+> third throwaway MetaMask account, fund it from the Hedera portal, and rehearse the full run with
+> that one.
+
 ### Terminals
 
 ```bash
@@ -300,6 +311,6 @@ next, with Chainlink's own disclaimer between them. That is the whole architectu
 |---|---|---|
 | UI can't reach the service | vite moved to 8081 | free 8080, restart `yarn start` |
 | Progress card sits on "Opened privately" | enclave still running (20–30 s) | wait; it says "about half a minute" after 12 s |
-| "That name is already taken" | you registered it in a rehearsal | use `MERIDIAN CAPITAL` |
+| "This wallet already belongs to an institution" | you registered in a rehearsal — the **wallet** is bound forever, a different name will not help | you need a fresh admin wallet; see the warning above |
 | A write silently does nothing | double-clicked; nonce collision | wait 30 s, retry once |
 | No `pre-trade check PASSED` line | rules weren't published first | publish the rulebook, then re-order |
