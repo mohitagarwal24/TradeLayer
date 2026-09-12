@@ -45,12 +45,24 @@ import {
  * rules, broker credentials — happens here, inside `handlerInTee`. What crosses back out is a
  * status, an order id, or a signed authorization the relayer cannot alter.
  *
- * Nothing in this file logs a symbol, a quantity, a price, or a balance.
+ * These handlers **do** narrate the order in the clear — the symbol, the amount, the rule that let
+ * it through. That is deliberate and is not a leak: `runtime.log` output belongs to the enclave,
+ * and CRE does not surface it outside the TEE in a deployed run ("user logs for this trigger will
+ * not be visible, and will not leave the TEE"). Under `cre workflow simulate` it prints locally,
+ * on a machine that already holds the keys in `cre/.env`.
+ *
+ * The invariant that matters is the one a step down: **nothing readable ever reaches the backend,
+ * the relayer or the chain.** Those see ciphertext, signatures and an amount. See `backend/src/log.ts`.
  */
 
 /** USDC. The settlement leg is Circle's token, used as-is — we wrap nothing. */
 const USDC_DECIMALS = 6n;
 const ONE_USDC = 10n ** USDC_DECIMALS;
+
+/** USDC base units -> a plain dollar string, for enclave narration only. */
+function dollars(baseUnits: bigint): string {
+  return `${baseUnits / ONE_USDC}.${(baseUnits % ONE_USDC).toString().padStart(6, "0").slice(0, 2)}`;
+}
 
 type Secrets = {
   intentKey: Uint8Array;
@@ -181,8 +193,16 @@ export function onIntake(runtime: TeeRuntime<Config>, payload: HTTPPayload): Int
     return reject("cannot open envelope");
   }
   if (intent.v !== 1 || intent.orderId.toLowerCase() !== orderId.toLowerCase()) return reject("intent/order mismatch");
+  // The one place the order exists in the clear. Narrated so a demo can show the same bytes being
+  // opaque to the intake API a second earlier and readable here — which is the whole architecture
+  // in two lines. In a deployed run CRE does not surface these outside the enclave.
+  runtime.log(
+    `H1 ${short}: envelope opened — {"symbol":"${intent.symbol}","side":"${intent.side}",` +
+      `"maxSpend":"$${dollars(BigInt(intent.maxSpend))}","nonce":${intent.nonce}}`,
+  );
   const recovered = recoverAddress(intentDigest(intent, BigInt(cfg.hedera.chainId), cfg.hedera.escrow), intent.sig);
   if (recovered.toLowerCase() !== order.requester.toLowerCase()) return reject("intent not signed by requester");
+  runtime.log(`H1 ${short}: intent signature recovers to ${recovered.slice(0, 12)}… = escrow.requester ✓`);
   if (intent.account.toLowerCase() !== order.requester.toLowerCase()) return reject("account mismatch");
   // The institution is whatever OrgWalletRegistry said when the escrow opened — the contract
   // resolved and stored it there. `intent.orgId` is user-supplied and unauthenticated, so it is
@@ -190,6 +210,7 @@ export function onIntake(runtime: TeeRuntime<Config>, payload: HTTPPayload): Int
   // judged against another institution's private rules.
   const orgId = order.orgId;
   if (toHex(bytes32(intent.orgId)).toLowerCase() !== orgId.toLowerCase()) return reject("org mismatch");
+  runtime.log(`H1 ${short}: institution taken from OrgWalletRegistry via the escrow — intent.orgId only compared, never trusted`);
   if (intent.side !== "BUY") return reject("only BUY supported");
   if (!cfg.hedera.symbols[intent.symbol]) return reject("unsupported symbol");
   // Alpaca rejects a notional buy under $1.
@@ -217,10 +238,15 @@ export function onIntake(runtime: TeeRuntime<Config>, payload: HTTPPayload): Int
     return reject("policy unreadable");
   }
   if (policy) {
+    runtime.log(`H1 ${short}: rulebook decrypted — ${(policyBlob.length - 2) / 2}B of ciphertext, unreadable outside this enclave`);
     const rule = policy.employees[order.requester.toLowerCase()];
     if (!rule || !rule.canBuy) return reject("policy: not permitted to buy");
     if (rule.restricted.includes(intent.symbol)) return reject("policy: restricted symbol");
     if (BigInt(intent.maxSpend) > BigInt(policy.maxOrderNotional)) return reject("policy: above max notional");
+    runtime.log(
+      `H1 ${short}: pre-trade check PASSED — permitted to buy ✓ · ${intent.symbol} not restricted ✓ · ` +
+        `$${dollars(BigInt(intent.maxSpend))} ≤ $${dollars(BigInt(policy.maxOrderNotional))} limit ✓`,
+    );
   } else {
     runtime.log(`H1 ${short}: no policy set for org — default allow`);
   }

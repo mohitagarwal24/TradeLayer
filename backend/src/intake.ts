@@ -8,7 +8,7 @@ import { escrow, ledger } from "./hedera";
 import { OrderStatus } from "./abis";
 import { toBytes32 } from "./eip712";
 import { execute } from "./creGateway";
-import { log, short } from "./log";
+import { detail, log, short } from "./log";
 
 /**
  * Intake API: the thin, stateless-in-spirit front door.
@@ -96,11 +96,21 @@ async function triggerSimulate(job: SealedJob): Promise<{ ok: boolean; note: str
     let out = "";
     const forward = (chunk: string) => {
       out += chunk;
-      // Surface what the enclave itself says as it happens, rather than after it exits. Its own
-      // logs never contain order contents — see cre/tradelayer/src/handlers.ts.
+      // Surface what the enclave says as it happens, rather than after it exits. These lines are
+      // the only place plaintext exists: the enclave holds the intent key, this process does not.
+      // CRE does not surface them outside the TEE in a deployed run, which is why the banner
+      // below quotes the CLI's own wording rather than paraphrasing it.
       for (const line of chunk.split("\n")) {
-        if (line.includes("[USER LOG]")) log("enclave", line.split("[USER LOG]")[1].trim());
-        else if (line.includes("Trigger requested TEE Execution")) log("enclave", "TEE execution requested — AWS Nitro, us-west-2");
+        if (line.includes("[USER LOG]")) {
+          const said = line.split("[USER LOG]")[1].trim();
+          // The broker leg is the hardest part of this system to fake, so give it its own colour
+          // rather than burying it in the enclave's stream. It still originates in the enclave.
+          if (said.startsWith("broker:")) log("broker", said.replace(/^broker:\s*/, ""));
+          else log("enclave", said);
+        } else if (line.includes("Trigger requested TEE Execution")) {
+          log("enclave", "entering the enclave — AWS Nitro, us-west-2");
+          detail([`CRE: "user logs for this trigger will not be visible, and will not leave the TEE"`]);
+        }
       }
     };
     child.stdout.on("data", d => forward(d.toString()));
@@ -147,6 +157,27 @@ async function trigger(stored: StoredEnvelope) {
   return result;
 }
 
+/**
+ * Show the sealed thing as it actually arrived.
+ *
+ * The point a demo has to make is that this is not "encrypted somewhere else" — the bytes sitting
+ * in this process are opaque *to this process*. Printing the ECIES envelope's real structure, and
+ * saying plainly that no key here can open it, is what makes the enclave's output a moment later
+ * mean something.
+ *
+ * `ct` length does reveal plaintext length (AES-GCM is a stream mode). That is a small metadata
+ * leak we accept: the escrow amount is already public on-chain, and the evidentiary value here is
+ * high. It is not a stand-in for the contents.
+ */
+function logSealed(what: string, id: string, envelope: Envelope["envelope"]) {
+  log("intake", what, { id: short(id, 12) });
+  detail([
+    `ephemeral key  ${short(envelope.epk, 24)}   (secp256k1, fresh per envelope)`,
+    `nonce  ${short(envelope.iv, 16)}    ciphertext  ${envelope.ct.length}B    tag  ${short(envelope.tag, 16)}`,
+    `this process holds no key that can open it — decryption happens only inside the enclave`,
+  ]);
+}
+
 /* ---------- handlers ---------- */
 
 export async function submitOrderHandler(req: Request, res: Response) {
@@ -166,10 +197,7 @@ export async function submitOrderHandler(req: Request, res: Response) {
   }
   const stored: StoredEnvelope = { orderId, envelope, receivedAt: Date.now(), triggers: [] };
   writeEnvelope(stored);
-  log("intake", "sealed envelope received — contents unreadable here", {
-    order: short(orderId),
-    ciphertext: `${envelope.ct.length}b`,
-  });
+  logSealed("sealed order envelope received", orderId, envelope);
 
   // Do not block the client on a multi-second simulation; it polls /orders/:id.
   void trigger(stored);
@@ -231,7 +259,7 @@ export async function submitPolicyHandler(req: Request, res: Response) {
   const { orgId, envelope } = parsed.data;
   const stored: StoredPolicy = { orgId, envelope, receivedAt: Date.now(), triggers: [] };
   fs.writeFileSync(policyPath(orgId), JSON.stringify(stored, null, 2), { mode: 0o600 });
-  log("intake", "sealed policy received — rules unreadable here", { org: orgId, ciphertext: `${envelope.ct.length}b` });
+  logSealed(`sealed rulebook received for ${orgId}`, orgId, envelope);
 
   const result = await runJob({
     id: orgId,
@@ -271,8 +299,11 @@ export async function recoverPendingEnvelopes() {
       await trigger(stored);
       retriggered++;
     } catch (error) {
-      console.warn(`[intake] recovery skipped ${stored.orderId}:`, (error as Error).message);
+      log("warn", "recovery skipped for an envelope", {
+        order: short(stored.orderId),
+        reason: (error as Error).message.slice(0, 100),
+      });
     }
   }
-  if (retriggered) console.log(`[intake] re-triggered ${retriggered} pending envelope(s)`);
+  if (retriggered) log("intake", `re-triggered ${retriggered} pending envelope(s) from disk`);
 }

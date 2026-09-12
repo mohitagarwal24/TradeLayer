@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { readable } from "@/lib/errors";
 import { Navigate } from "react-router-dom";
 import { useAccount, useReadContract } from "wagmi";
 import { toast } from "sonner";
-import { Eye, Loader2, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +48,7 @@ export default function Positions() {
 
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const [revealedBlob, setRevealedBlob] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const { data: entry } = useReadContract({
@@ -75,17 +77,23 @@ export default function Positions() {
       }
       setPortfolio(decryptUserBlob(key, blob as `0x${string}`));
       setRevealed(true);
+      setRevealedBlob(blob as string);
     } catch (error) {
-      toast.error("Couldn't open your positions", { description: ((error as Error).message ?? "").slice(0, 160) });
+      toast.error("Couldn't open your positions", { description: readable(error) });
     } finally {
       setBusy(false);
     }
   };
 
+  const hide = () => {
+    setRevealed(false);
+    setPortfolio(null);
+  };
+
   const positions = Object.entries(portfolio?.positions ?? {}).filter(([, p]) => BigInt(p.qty) > 0n);
 
   return (
-    <div className="container mx-auto max-w-2xl space-y-5 px-4 py-10">
+    <div className="container mx-auto max-w-3xl space-y-5 px-4 py-10">
       <header className="flex items-center justify-between">
         <h1 className="font-heading text-2xl font-semibold tracking-tight">Positions</h1>
         <Badge variant="secondary" className="font-normal">
@@ -99,15 +107,31 @@ export default function Positions() {
             <span className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-primary" /> Only you can read this
             </span>
-            {!revealed && (
-              <Button size="sm" onClick={reveal} disabled={busy}>
-                {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Eye className="mr-2 h-4 w-4" />}
-                Reveal
-              </Button>
-            )}
+            {/* Re-hidable: a demo needs a second take, and "revealed" should not be a one-way
+                door for the rest of the session. */}
+            <Button size="sm" variant={revealed ? "ghost" : "default"} onClick={revealed ? hide : reveal} disabled={busy}>
+              {busy ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : revealed ? (
+                <EyeOff className="mr-2 h-4 w-4" />
+              ) : (
+                <Eye className="mr-2 h-4 w-4" />
+              )}
+              {revealed ? "Hide" : "Reveal"}
+            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {/* The encrypted record refetches every 10s, but plaintext is only produced on reveal.
+              If a settlement lands while the page is open, say so instead of showing stale rows. */}
+          {revealed && revealedBlob && blob && blob !== revealedBlob && (
+            <p className="mb-3 rounded-md border border-border/60 bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+              This has changed since you opened it.{" "}
+              <button className="underline underline-offset-2" onClick={reveal}>
+                Open the latest
+              </button>
+            </p>
+          )}
           {!revealed ? (
             <p className="text-sm text-muted-foreground">
               {hasRecord
@@ -152,8 +176,8 @@ export default function Positions() {
       </Card>
 
       <p className="px-1 text-xs text-muted-foreground">
-        Shares are held for you in a shared vault, backed one-for-one by real shares at the broker.
-        Nothing on the chain says which of them are yours.
+        Your shares sit in a pooled account, backed one-for-one by real shares at the broker.
+        Nothing public says which of them are yours.
       </p>
     </div>
   );

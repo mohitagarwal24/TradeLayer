@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { readable } from "@/lib/errors";
 import { Link } from "react-router-dom";
 import { useAccount } from "wagmi";
 import { toast } from "sonner";
@@ -205,12 +206,3 @@ export default function Home() {
   );
 }
 
-/** Contract reverts are unreadable by default; surface the part a person can act on. */
-function readable(error: unknown): string {
-  const message = (error as Error)?.message ?? String(error);
-  if (/OrgExists/.test(message)) return "That name is already taken.";
-  if (/UnknownOrg/.test(message)) return "No institution by that name.";
-  if (/AlreadyBound/.test(message)) return "This wallet already belongs to an institution.";
-  if (/User rejected|denied/i.test(message)) return "You cancelled the signature.";
-  return message.slice(0, 160);
-}

@@ -1,7 +1,7 @@
 import { formatUnits, type Contract, type Log } from "ethers";
 import { config } from "./config";
-import { escrow, provider, registry, router, vault } from "./hedera";
-import { log, short } from "./log";
+import { escrow, ledger, provider, registry, router, vault } from "./hedera";
+import { detail, log, short } from "./log";
 
 /**
  * Chain narration.
@@ -18,6 +18,9 @@ import { log, short } from "./log";
 
 const POLL_MS = Number(process.env.WATCH_POLL_MS ?? 4_000);
 const usdc = (v: bigint) => `${formatUnits(v, 6)} USDC`;
+const ZERO_ADDRESS = `0x${"0".repeat(40)}`;
+/** A deadline is only meaningful on camera as a clock time. */
+const when = (unix: bigint) => new Date(Number(unix) * 1000).toLocaleTimeString();
 const text = (b32: string) => Buffer.from(b32.slice(2), "hex").toString("utf8").replace(/\0+$/, "") || b32.slice(0, 10);
 
 type Narrator = { contract: Contract; events: Record<string, (args: readonly unknown[]) => void> };
@@ -59,12 +62,21 @@ function narrators(): Narrator[] {
     {
       contract: escrow,
       events: {
-        OrderOpened: ([orderId, requester, orgId, amount]) =>
+        OrderOpened: ([orderId, requester, orgId, amount, , expiry, schedule]) => {
           log("chain", `order opened — ${usdc(amount as bigint)} reserved from the institution's pool`, {
             order: short(orderId as string),
             org: text(orgId as string),
-            visible: "amount + deadline only",
-          }),
+          });
+          // Spell out what an observer actually gets. The claim "amount and deadline only" is
+          // worth more when the line prints the deadline rather than asserting it exists.
+          detail([
+            `everything public about this order: amount ${usdc(amount as bigint)} · deadline ${when(expiry as bigint)}`,
+            `not the symbol, not the share count, not the price, not who benefits`,
+            (schedule as string) !== ZERO_ADDRESS
+              ? `self-refund scheduled on-chain at the deadline — no keeper, no operator`
+              : `no refund schedule attached — expiry would need a manual refund`,
+          ]);
+        },
         OrderSettled: ([orderId, spent, returned]) =>
           log("chain", `order SETTLED — ${usdc(spent as bigint)} spent, ${usdc(returned as bigint)} returned to the pool`, {
             order: short(orderId as string),
@@ -77,6 +89,24 @@ function narrators(): Narrator[] {
           log("chain", `order REFUNDED at expiry — ${usdc(returned as bigint)} returned, no keeper involved`, {
             order: short(orderId as string),
           }),
+        ScheduleFailed: ([orderId, code]) =>
+          log("warn", `the self-refund could NOT be scheduled — this order will not refund itself at expiry`, {
+            order: short(orderId as string),
+            hts: String(code),
+          }),
+      },
+    },
+    {
+      contract: ledger,
+      events: {
+        // What the world sees of a position: a counter moving and a hash. Narrated because this is
+        // the privacy claim in its most literal form.
+        EntryUpdated: ([accountId, version, blobHash]) => {
+          log("chain", `encrypted position written — version ${String(version)}`, { account: short(accountId as string, 12) });
+          detail([`blob hash ${short(blobHash as string, 18)} — the ciphertext itself is on-chain and only its owner holds the key`]);
+        },
+        PolicyUpdated: ([orgId, version]) =>
+          log("chain", `rulebook published for "${text(orgId as string)}" — version ${String(version)}, stored as ciphertext`, {}),
       },
     },
   ];

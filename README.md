@@ -125,8 +125,15 @@ Four handlers, all `handlerInTee` (nitro / us-west-2):
 | **H4 policy** | HTTP (shares H1's trigger) | opens the admin's sealed rulebook, proves authorship against `OrgWalletRegistry`, re-encrypts it and signs `PolicyUpdate` |
 
 Sensitive inputs processed only inside the TEE: the sealed order, the sealed rulebook, both
-encrypted ledgers, and the Vault DON secrets. Nothing in `handlers.ts` logs a symbol, quantity,
-price, balance or rule. Hedera is read by `eth_call` over HTTPS because it is not a CRE chain.
+encrypted ledgers, and the Vault DON secrets. Hedera is read by `eth_call` over HTTPS because it
+is not a CRE chain.
+
+The handlers **do** narrate the order in the clear — symbol, amount, the rule that let it through.
+That is enclave output: CRE does not surface `runtime.log` outside the TEE in a deployed run, and
+under `cre workflow simulate` it prints on a machine that already holds the keys. The invariant
+that matters is one step down — **nothing readable reaches the backend, the relayer or the chain.**
+The intake API prints the sealed envelope's structure and says plainly that it holds no key that
+can open it, because it doesn't.
 
 **H1 never trusts `intent.orgId`.** It is user-supplied; the institution comes from the escrow,
 which resolved it from the registry at open time. And a policy the enclave cannot decrypt fails
