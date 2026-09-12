@@ -1,8 +1,12 @@
 # TradeLayer — 2:30 demo script
 
-Recorded **Sat 12 Sep 2026**, US market closed. The order is genuinely queued at the broker — say
-so on camera. A judge who opens Alpaca will see exactly that, and saying it first is far stronger
-than being caught by it.
+Recorded **Sat 12 Sep 2026**. The US market is shut, so **demo mode is on**: the fill is simulated
+locally at the real last-traded price, and everything downstream of it — the settlement, the escrow
+release, the encrypted position — is a genuine Hedera transaction.
+
+**Say the word "simulated" once, on camera, at the fill.** It costs four seconds. The alternative is
+a judge finding `filled_qty 0` in Alpaca after watching a fill, and disbelieving the real parts too.
+The terminal labels it for you, so you only have to read what is on screen.
 
 Roughly **half this video is external proof**: HashScan, Alpaca, Chainlink's dashboard, Hedera's
 own tokenization studio. Judges believe what they can check themselves.
@@ -44,6 +48,7 @@ take, sped up.
 | Admit on the equities | ~10 s | 3 s |
 | Publish the rulebook | ~35 s (enclave) | 5 s |
 | Place the order | ~40 s (enclave) | 8 s |
+| Run H2, fill + settle | ~35 s (enclave) | 6 s |
 
 **Never double-click a write.** One relayer key, no nonce queue.
 
@@ -82,9 +87,22 @@ It prints every verifiable link for **that** order — the Hedera transaction, t
 the exact `client_order_id` to search in Alpaca. Copy from there; never type an explorer URL on
 camera.
 
+### Demo mode — on now, must come off after
+
+| Where | What | Committed? |
+|---|---|---|
+| `backend/.env` | `DEMO_MARKET_OPEN=true` — reports the market open, hides the closed banner | no (gitignored) |
+| `cre/tradelayer/config/config.testnet.json` | `broker.simulateFill: true` | **no — uncommitted** |
+| `cre/tradelayer/src/broker.ts` | `simulateFillOutsideHours()` | **no — uncommitted** |
+| `backend/src/org.ts`, `src/config.ts` | the switches above | **no — uncommitted** |
+
+```bash
+./revert-demo.sh     # removes all of it; git status goes clean
+```
+
 ### Last checks
 
-- `curl localhost:8000/market/clock` → `"isOpen":false`
+- `curl localhost:8000/market/clock` → `"isOpen":true,"demo":true`
 - Both wallets in MetaMask on **Hedera Testnet (296)**
 - MetaMask set to the **admin** account to start
 
@@ -138,7 +156,7 @@ camera.
 > "This wallet holds **no** company money — check it, it has zero USDC. The escrow draws from the
 > firm's treasury directly. Traders get authority, not custody. That's how a real desk works."
 
-### 1:40 – 2:02 · The proof, in the terminal — *full-screen it*
+### 1:40 – 1:58 · The proof, in the terminal — *full-screen it*
 
 > "The backend receives ciphertext and holds no key that can open it. It says so itself."
 
@@ -146,10 +164,22 @@ camera.
 
 > "It's opened only inside a Chainlink Confidential Workflow on AWS Nitro. Same bytes — readable
 > there and nowhere else. It checks the firm's private rules, then places **one real order** at
-> Alpaca. The market is shut, so it's genuinely queued — filled quantity zero, waiting for
-> Monday. Not faked into a fill."
+> Alpaca."
 
-### 2:02 – 2:18 · What the chain shows, and what it doesn't — *tab 8*
+### 1:58 – 2:12 · The fill and the settlement
+*Run H2 in the spare terminal:*
+`cd cre && cre workflow simulate ./tradelayer --target testnet-settings --trigger-index 1 --non-interactive --allow-insecure-rpc`
+
+> "The market is shut this weekend, so I'm **simulating the fill** — at Tesla's real last traded
+> price. Everything past that line is real."
+
+*Terminal: `SIMULATED FILL … using the real last trade for TSLA: $365.485`, then the settlement.*
+
+> "Shares credited and escrow released in **one signed authorization** — they cannot come apart.
+> The position is written back encrypted. Five USDC left the treasury; the firm now holds
+> 0.0136 of a Tesla share, and only this employee can read that."
+
+### 2:12 – 2:22 · What the chain shows, and what it doesn't — *tab 8*
 *Paste the transaction URL from `proofLinks.ts`. Scroll to the event log.*
 
 > "Here's that order on Hedera. Everything public about it is an amount and a deadline. Not the
@@ -160,11 +190,12 @@ camera.
 > "And the refund is already scheduled on-chain to fire at the deadline. If nothing fills, the
 > money goes back to the treasury on its own — no keeper, no operator, nobody to trust."
 
-### 2:18 – 2:28 · The same order at the broker — *tab 6*
+### 2:22 – 2:28 · The same order at the broker — *tab 6*
 *Search the `client_order_id` from `proofLinks.ts`.*
 
-> "The same order at Alpaca. That identifier is the first half of the on-chain order id — so you
-> can carry an ID off the blockchain straight into the broker and find the same trade."
+> "The same order at Alpaca — placed for real, and still queued, because the market is closed.
+> That identifier is the first half of the on-chain order id, so you can carry an ID off the
+> blockchain straight into the broker and find the same trade."
 
 ### 2:28 – 2:30 · Close — *tab 7*
 
@@ -174,36 +205,55 @@ camera.
 
 ## What the terminal shows
 
-From a real run today (abridged):
+From a real run today — this is the settled flow, not an illustration:
 
 ```
-intake   sealed order envelope received id=0x9fae81a258…
+intake   sealed order envelope received id=0x246e90402b…
          ephemeral key  0x037789ec5f8820099bd40b…   (secp256k1, fresh per envelope)
          nonce  70iTV6wQu7SMaz1p    ciphertext  628B    tag  6RqP/4UD454STHu4…
          this process holds no key that can open it — decryption happens only inside the enclave
 
-chain    order opened — 5.0 USDC reserved from the institution's pool  org=NORTHWIND CAPITAL
-         everything public about this order: amount 5.0 USDC · deadline 4:22:35 PM
+chain    order opened — 5.0 USDC reserved from the institution's pool
+         everything public about this order: amount 5.0 USDC · deadline 6:45:02 PM
          not the symbol, not the share count, not the price, not who benefits
          self-refund scheduled on-chain at the deadline — no keeper, no operator
 
 enclave  entering the enclave — AWS Nitro, us-west-2
          CRE: "user logs for this trigger will not be visible, and will not leave the TEE"
 enclave  H1: envelope opened — {"symbol":"TSLA","side":"BUY","maxSpend":"$5.00","nonce":…}
-enclave  H1: intent signature recovers to 0xf3911d3810… = escrow.requester ✓
+enclave  H1: intent signature recovers to 0x2325d18b00… = escrow.requester ✓
 enclave  H1: institution taken from OrgWalletRegistry via the escrow — intent.orgId never trusted
 enclave  H1: rulebook decrypted — 329B of ciphertext, unreadable outside this enclave
 enclave  H1: pre-trade check PASSED — permitted ✓ · TSLA not restricted ✓ · $5.00 ≤ $100.00 ✓
 
 broker   POST https://paper-api.alpaca.markets/v2/orders — TSLA market buy, notional $5.00
-broker   client_order_id 9fae81a2584ba474… (idempotency barrier — a retry cannot buy twice)
-broker   Alpaca responded — id a22f6c30-8697-4f63-b4e1-912b081e9c05
+broker   client_order_id 246e90402bdfcfc0a760dbb7e3ea9309 (a retry cannot buy twice)
+broker   Alpaca responded — id 45a6f584-93f7-40f0-b208-edd8c630c7d2
 broker     status accepted · filled_qty 0
-broker     not filled — the market is closed, so it is queued and fills at the next session
 
-enclave  H1: placed; ledger v1 relay confirmed
-chain    encrypted position written — version 1
-         blob hash 0xfb1e1cc07ec3df0a… — only its owner holds the key
+enclave  H1: placed; ledger v4 relay confirmed
+chain    encrypted position written — version 4
+
+── then H2 ─────────────────────────────────────────────────────────────────────
+enclave  H2: 1 open order(s)
+broker   ⚠ SIMULATED FILL — the market is closed, so Alpaca has not filled this order
+broker     using the real last trade for TSLA: $365.485
+broker     pretending: filled_qty 0.013680452 · avg $365.485 · notional $5.00
+broker     everything downstream of this line is real — settlement, escrow, ledger
+enclave  H2: filled 0.013680452 TSLA @ $365.485 — settling $5.00 atomically:
+             shares credited ⇔ escrow released
+enclave  H2: settlement confirmed; encrypted position now v5
+chain    order SETTLED — 5.0 USDC spent, 0.0 USDC returned to the pool
+chain    encrypted position written — version 5
+```
+
+Decrypted afterwards with the employee's own key — and only with it:
+
+```
+PUBLIC    ledger entry v5, 873 bytes of ciphertext
+          → symbol, quantity, price, position: NOT VISIBLE ANYWHERE ABOVE
+PRIVATE   positions  {"TSLA":"0.013680452"}
+          stranger decrypt  correctly rejected
 ```
 
 **The two lines to point at:** `this process holds no key that can open it`, then
@@ -229,7 +279,12 @@ next, with Chainlink's own disclaimer between them. That is the whole architectu
 
 ## Say these, don't hide them
 
-- The market is closed; the order is queued, not filled.
+- The market is closed. The **order** is real and queued at Alpaca; the **fill** is simulated at the
+  real last price so the settlement path can be shown. Everything after the fill — settlement,
+  escrow release, encrypted position — is a genuine on-chain transaction.
+- H3 will **not** mint the equity tokens against a simulated fill: it compares on-chain supply with
+  the broker's actual positions, and Alpaca holds none. The reserve check is doing its job. If
+  asked, that is a good answer, not a gap.
 - The enclave runs locally through `cre workflow simulate` — same compiled WASM, same handlers.
   The workflow **is** deployed on CRE; confidential-HTTP consensus is a beta limitation we hit and
   reported to Chainlink.
