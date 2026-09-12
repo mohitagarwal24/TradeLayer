@@ -124,15 +124,30 @@ export async function startChainNarration() {
     try {
       const head = await provider.getBlockNumber();
       if (head < from) return; // a reorg or a restarted node; wait for it to catch up
+
+      // One `getLogs` per contract, not one per event name. Filtering per name meant fourteen
+      // requests every four seconds against Hashio, which is a shared public relay and answers
+      // 500 under that load; this is five.
+      const pending: Array<{ block: number; index: number; say: () => void }> = [];
       for (const { contract, events } of feeds) {
-        for (const [name, say] of Object.entries(events)) {
-          const found: Log[] = await contract.queryFilter(contract.filters[name](), from, head);
-          for (const entry of found) {
-            const parsed = contract.interface.parseLog({ topics: [...entry.topics], data: entry.data });
-            if (parsed) say(parsed.args);
-          }
+        const logs: Log[] = await provider.getLogs({
+          address: contract.target as string,
+          fromBlock: from,
+          toBlock: head,
+        });
+        for (const entry of logs) {
+          // Unknown to our minimal ABI — parseLog returns null and we simply do not narrate it.
+          const parsed = contract.interface.parseLog({ topics: [...entry.topics], data: entry.data });
+          const say = parsed ? events[parsed.name] : undefined;
+          if (parsed && say) pending.push({ block: entry.blockNumber, index: entry.index, say: () => say(parsed.args) });
         }
       }
+
+      // Nothing is said until every query has succeeded. Narrating inside the loop meant a failure
+      // partway through left `from` unmoved with some lines already printed — so the retry read the
+      // same range and said them a second time.
+      pending.sort((a, b) => a.block - b.block || a.index - b.index);
+      for (const entry of pending) entry.say();
       from = head + 1;
     } catch (error) {
       // Narration is best-effort: a flaky RPC must never take the API down with it.
