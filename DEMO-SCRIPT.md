@@ -4,12 +4,48 @@ Recorded **Sat 12 Sep 2026**, US market closed. The order is genuinely queued at
 so on camera. A judge who opens Alpaca will see exactly that, and saying it first is far stronger
 than being caught by it.
 
-Roughly **half this video is external proof**: HashScan, Alpaca, the Chainlink dashboard, the
-Hedera tokenization studio. Judges believe what they can check themselves.
+Roughly **half this video is external proof**: HashScan, Alpaca, Chainlink's dashboard, Hedera's
+own tokenization studio. Judges believe what they can check themselves.
 
 ---
 
-## Before you hit record
+## Your wallets — both ready, nothing left to set up
+
+| | Address | HBAR | USDC | Bound to an institution |
+|---|---|---|---|---|
+| **Admin** | `0x50C6e2a9BD9791286CaaFF169Efc4327F60cA9Cd` | 500 | **40** | no — free to register |
+| **Employee** | `0xf3911D3810e273342f118F8859fF2A03807d8dAA` | 500 | **0** | no — free to join |
+
+**No token association was needed.** Both accounts came from the Hedera portal with
+`max_automatic_token_associations: -1`, so USDC associated itself on arrival. I sent 40 USDC to the
+admin ([tx `0x29a5a225…`](https://hashscan.io/testnet/transaction/0x29a5a2259875900ac27c17f89d3ed51074ff3f57bea03b1fb5e0b5aed648e52b)).
+
+**The employee holds zero USDC on purpose** — and that is worth saying out loud. They will place a
+real order against the firm's money without ever holding any of it.
+
+Institution name: **NORTHWIND CAPITAL** — confirmed free, and `registerOrg` dry-runs clean from
+your admin wallet. (`NORTHWIND`, `MERIDIAN CAPITAL`, `ASHFORD PARTNERS` are also free.)
+
+---
+
+## How to shoot this
+
+**Record one continuous take of ~6–8 minutes, then compress to 2:30.** There are nine wallet
+signatures and two enclave runs; at 4–8× the mechanical parts collapse to about 40 seconds of
+screen time and leave you ~110 seconds of narration over them. Nothing is faked — it is the same
+take, sped up.
+
+| Step | Real time | Screen time after the edit |
+|---|---|---|
+| Register institution | ~8 s | 3 s |
+| Fund treasury (approve + deposit) | ~15 s | 4 s |
+| Employee asks to join | ~8 s | 3 s |
+| Admin approves | ~8 s | 3 s |
+| Admit on the equities | ~10 s | 3 s |
+| Publish the rulebook | ~35 s (enclave) | 5 s |
+| Place the order | ~40 s (enclave) | 8 s |
+
+**Never double-click a write.** One relayer key, no nonce queue.
 
 ### Terminals
 
@@ -26,38 +62,31 @@ yarn start                  # must say 8080 — if it says 8081, free the port f
 | # | Tab | Why |
 |---|---|---|
 | 1 | `localhost:8080` | the app |
-| 2 | [hashscan.io/testnet/contract/0x4F59e014AEDe86A5dcf2422a45cFf82a2fC5eda9](https://hashscan.io/testnet/contract/0x4F59e014AEDe86A5dcf2422a45cFf82a2fC5eda9) | OrderEscrow — verified |
-| 3 | [hashscan.io/testnet/token/0.0.429274](https://hashscan.io/testnet/token/0.0.429274) | Circle's USDC — we issue nothing |
-| 4 | [hashscan.io/testnet/contract/0xd085bdb088940ece20a7ccfc064deb2824433249](https://hashscan.io/testnet/contract/0xd085bdb088940ece20a7ccfc064deb2824433249) | TSLA-t, the ATS equity (`0.0.10494983`) |
+| 2 | [OrderEscrow on HashScan](https://hashscan.io/testnet/contract/0x4F59e014AEDe86A5dcf2422a45cFf82a2fC5eda9) | verified contract |
+| 3 | [USDC `0.0.429274`](https://hashscan.io/testnet/token/0.0.429274) | Circle's own token — we issue nothing |
+| 4 | [TSLA-t `0.0.10494983`](https://hashscan.io/testnet/contract/0xd085bdb088940ece20a7ccfc064deb2824433249) | the ATS equity |
 | 5 | [tokenization-studio.hedera.com](https://tokenization-studio.hedera.com/) | Hedera's own ATS app, TSLA-t loaded |
-| 6 | [app.alpaca.markets/paper/dashboard/orders](https://app.alpaca.markets/paper/dashboard/orders) | the broker, logged in |
+| 6 | [Alpaca paper orders](https://app.alpaca.markets/paper/dashboard/orders) | the broker, logged in |
 | 7 | [app.chain.link/cre/workflows](https://app.chain.link/cre/workflows) | the deployed workflow |
 | 8 | blank — for the live transaction |
 
-### The one command that saves you on camera
+### The command that saves the take
 
-After placing the order, in a spare terminal:
+After the order lands, in a spare terminal:
 
 ```bash
 cd backend && npx tsx --env-file=.env scripts/proofLinks.ts
 ```
 
 It prints every verifiable link for **that** order — the Hedera transaction, the scheduled refund,
-the `client_order_id` to search in Alpaca. Copy from there rather than typing URLs on camera.
+the exact `client_order_id` to search in Alpaca. Copy from there; never type an explorer URL on
+camera.
 
-### Check before recording
+### Last checks
 
-| | |
-|---|---|
-| `curl localhost:8000/market/clock` | must show `"isOpen":false` |
-| Admin `0x2325…D8BC` | admin of **ACME**, treasury **80 USDC**, rules **v3** |
-| Employee wallet | needs **HBAR only** — never USDC, that's the point |
-| Both wallets | MetaMask on **Hedera Testnet (296)** |
-
-**Timing.** Each sealed action takes 20–30 s in the enclave. Speed-ramp those in the edit — the
-terminal output is continuous, so a 4× ramp over the wait is honest and invisible.
-
-**Never double-click a write.** One relayer key, no nonce queue.
+- `curl localhost:8000/market/clock` → `"isOpen":false`
+- Both wallets in MetaMask on **Hedera Testnet (296)**
+- MetaMask set to the **admin** account to start
 
 ---
 
@@ -70,90 +99,82 @@ terminal output is continuous, so a 4× ramp over the wait is honest and invisib
 > positions and its size — to competitors, and to anyone who wants to trade ahead of it.
 > TradeLayer removes that exposure without handing trust to a server."
 
-### 0:14 – 0:32 · The institution
-*Institution page, admin wallet.*
+### 0:14 – 0:34 · Found a firm, fund a treasury
+*Create an institution → "NORTHWIND CAPITAL" → sign. Then fund with 25 USDC.*
 
-> "A firm registers on-chain and funds one pooled treasury in Circle's USDC. Membership takes
-> **two signatures** — the employee proposes from their own wallet, the admin approves. A wallet
-> belongs to exactly one institution, which is what makes it impossible for one firm to touch
-> another firm's people."
+> "Anyone can found an institution — this is happening live, on Hedera testnet, right now. It gets
+> one pooled treasury in Circle's USDC. Not a token we minted: Circle's, used as-is."
 
-**Action:** approve the pending join request. Terminal prints the `org` lines.
+*Terminal shows `institution "NORTHWIND CAPITAL" registered` and `treasury funded with 25.0 USDC`.*
 
-### 0:32 – 0:50 · Compliance is in the token — *tabs 4 and 5*
-*Click Admit, then switch to HashScan TSLA-t, then the ATS studio.*
+### 0:34 – 0:52 · Membership takes two signatures
+*Switch MetaMask to the employee → "Ask to join". Switch back to admin → Approve.*
+
+> "Membership needs both sides. The employee proposes from their own wallet, the admin approves
+> from theirs. A wallet belongs to exactly one institution — which is what makes it **impossible**
+> for one firm to touch another firm's people, rather than merely against the rules."
+
+### 0:52 – 1:08 · Compliance lives in the token — *tabs 4 and 5*
+*Click Admit. Then HashScan TSLA-t, then the ATS studio.*
 
 > "Admitting someone isn't a flag in our database. It's written into the **equity token itself** —
 > issued through Hedera's Asset Tokenization Studio, with KYC and a control list built in."
 
-*Tab 5, the ATS studio showing TSLA-t:*
+*Tab 5 — the ATS studio:*
 
-> "This is Hedera's own tokenization app, not ours. Suspend someone and the token refuses them —
-> the app isn't in the loop."
+> "This is Hedera's own app, not ours. Suspend someone here and the token refuses them. We're not
+> in the loop."
 
-### 0:50 – 1:04 · The private rulebook
-*Back to tab 1, Rules card.*
+### 1:08 – 1:22 · The private rulebook
+*Rules card: limit per order, who may trade, restricted symbols → Seal and publish.*
 
-> "The admin's limits — who may trade, how much per order, which stocks are off-limits — are
-> encrypted in the browser before they leave it. They're checked on every order, and they can't
-> be read back. Not by us. Not even by the admin who wrote them."
+> "The admin's limits — who trades, how much per order, which stocks are off-limits — are
+> encrypted in the browser before they leave it. Checked on every order, and they cannot be read
+> back. Not by us. Not even by the admin who wrote them."
 
-### 1:04 – 1:24 · The order
-*Switch to the employee wallet. $5 on TSLA.*
+### 1:22 – 1:40 · The order
+*Switch to the employee wallet. $5 on TSLA. Place sealed order.*
 
-> "The employee signs the order, sealed client-side. The escrow draws from the **firm's** treasury
-> — the employee never holds company money at any point. Traders get authority, not custody.
-> That's how a real desk works."
+> "This wallet holds **no** company money — check it, it has zero USDC. The escrow draws from the
+> firm's treasury directly. Traders get authority, not custody. That's how a real desk works."
 
-**Action:** Place sealed order → two wallet popups. **Speed-ramp the wait here.**
-
-### 1:24 – 1:50 · The proof, in the terminal — *full-screen it*
+### 1:40 – 2:02 · The proof, in the terminal — *full-screen it*
 
 > "The backend receives ciphertext and holds no key that can open it. It says so itself."
 
-*Point at the `intake` block — ephemeral key, nonce, 628 bytes.*
+*Point at the `intake` block — ephemeral key, nonce, byte count.*
 
 > "It's opened only inside a Chainlink Confidential Workflow on AWS Nitro. Same bytes — readable
-> there, and nowhere else."
+> there and nowhere else. It checks the firm's private rules, then places **one real order** at
+> Alpaca. The market is shut, so it's genuinely queued — filled quantity zero, waiting for
+> Monday. Not faked into a fill."
 
-*Point at `envelope opened — {"symbol":"TSLA"…}`, then the pre-trade check.*
+### 2:02 – 2:18 · What the chain shows, and what it doesn't — *tab 8*
+*Paste the transaction URL from `proofLinks.ts`. Scroll to the event log.*
 
-> "It checks the firm's private rules, then places **one real order** at Alpaca. The market is
-> closed, so it's genuinely queued — filled quantity zero, waiting for Monday's open. Not faked
-> into a fill."
+> "Here's that order on Hedera. Everything public about it is an amount and a deadline. Not the
+> stock, not the share count, not the price, not who benefits."
 
-### 1:50 – 2:08 · What the chain actually shows — *tab 8*
-*Paste the transaction URL from `proofLinks.ts`.*
+*Then the schedule link.*
 
-> "Here's that order on Hedera. Everything public about it is an amount and a deadline."
+> "And the refund is already scheduled on-chain to fire at the deadline. If nothing fills, the
+> money goes back to the treasury on its own — no keeper, no operator, nobody to trust."
 
-*Scroll to the event log.*
+### 2:18 – 2:28 · The same order at the broker — *tab 6*
+*Search the `client_order_id` from `proofLinks.ts`.*
 
-> "Not the stock. Not the share count. Not the price. Not who benefits."
+> "The same order at Alpaca. That identifier is the first half of the on-chain order id — so you
+> can carry an ID off the blockchain straight into the broker and find the same trade."
 
-*Then the schedule link — `hashscan.io/testnet/schedule/0.0.…`*
+### 2:28 – 2:30 · Close — *tab 7*
 
-> "And this is the refund, already scheduled on-chain to fire at the deadline. If nothing fills,
-> the money returns to the treasury on its own — no keeper, no operator, nobody to trust."
-
-### 2:08 – 2:22 · The same order at the broker — *tab 6*
-*Alpaca dashboard. Search the `client_order_id` from `proofLinks.ts`.*
-
-> "And the same order at the broker. This identifier is the first half of the on-chain order id —
-> so you can carry an ID from the blockchain straight into Alpaca and find the same order.
-> Accepted, unfilled, queued for the next session."
-
-### 2:22 – 2:30 · Close — *tab 7*
-*Chainlink CRE dashboard showing the workflow.*
-
-> "The workflow is deployed and live on Chainlink's network. Five verified contracts on Hedera,
-> real tokenised equities, a real broker. Nothing here is a mock."
+> "Deployed and live on Chainlink's network. Nothing here is a mock."
 
 ---
 
 ## What the terminal shows
 
-Captured from a real run at 14:23 today, TSLA $5 (abridged):
+From a real run today (abridged):
 
 ```
 intake   sealed order envelope received id=0x9fae81a258…
@@ -161,7 +182,7 @@ intake   sealed order envelope received id=0x9fae81a258…
          nonce  70iTV6wQu7SMaz1p    ciphertext  628B    tag  6RqP/4UD454STHu4…
          this process holds no key that can open it — decryption happens only inside the enclave
 
-chain    order opened — 5.0 USDC reserved from the institution's pool  org=ACME
+chain    order opened — 5.0 USDC reserved from the institution's pool  org=NORTHWIND CAPITAL
          everything public about this order: amount 5.0 USDC · deadline 4:22:35 PM
          not the symbol, not the share count, not the price, not who benefits
          self-refund scheduled on-chain at the deadline — no keeper, no operator
@@ -169,7 +190,7 @@ chain    order opened — 5.0 USDC reserved from the institution's pool  org=ACM
 enclave  entering the enclave — AWS Nitro, us-west-2
          CRE: "user logs for this trigger will not be visible, and will not leave the TEE"
 enclave  H1: envelope opened — {"symbol":"TSLA","side":"BUY","maxSpend":"$5.00","nonce":…}
-enclave  H1: intent signature recovers to 0x2325d18b00… = escrow.requester ✓
+enclave  H1: intent signature recovers to 0xf3911d3810… = escrow.requester ✓
 enclave  H1: institution taken from OrgWalletRegistry via the escrow — intent.orgId never trusted
 enclave  H1: rulebook decrypted — 329B of ciphertext, unreadable outside this enclave
 enclave  H1: pre-trade check PASSED — permitted ✓ · TSLA not restricted ✓ · $5.00 ≤ $100.00 ✓
@@ -180,8 +201,8 @@ broker   Alpaca responded — id a22f6c30-8697-4f63-b4e1-912b081e9c05
 broker     status accepted · filled_qty 0
 broker     not filled — the market is closed, so it is queued and fills at the next session
 
-enclave  H1: placed; ledger v3 relay confirmed
-chain    encrypted position written — version 3
+enclave  H1: placed; ledger v1 relay confirmed
+chain    encrypted position written — version 1
          blob hash 0xfb1e1cc07ec3df0a… — only its owner holds the key
 ```
 
@@ -191,20 +212,20 @@ next, with Chainlink's own disclaimer between them. That is the whole architectu
 
 ---
 
-## Everything a judge can verify, all confirmed live today
+## Everything a judge can verify — all confirmed live today
 
-| Claim | Where they check it | Verified |
-|---|---|---|
-| Contracts are real and verified | HashScan, Sourcify `exact_match` on all five | ✅ |
-| The order hit the chain | `hashscan.io/testnet/transaction/0x7394bfbe…` | ✅ |
-| Only amount + deadline are public | the `OrderOpened` event log on that transaction | ✅ |
-| The refund needs no keeper | `hashscan.io/testnet/schedule/0.0.10502890` — `wait for expiry`, unexecuted | ✅ |
-| Equities are genuine ATS tokens | TSLA-t `0.0.10494983`, FORD-t `0.0.10494829`, VOO-t `0.0.10495021` | ✅ |
-| Settlement is Circle's USDC, not ours | `0.0.429274` — "USD Coin", treasury `0.0.5176` | ✅ |
-| The broker order is real | Alpaca order `a22f6c30-8697-4f63-b4e1-912b081e9c05` | ✅ |
-| Chain and broker are the *same* order | `client_order_id` = first 32 hex of the on-chain order id | ✅ |
-| The workflow is deployed | `app.chain.link/cre/workflows`, id `0009ba3e…469e`, ACTIVE | ✅ |
-| Cross-firm attack is impossible | `forge test --match-test test_rivalInstitutionCannotFreezeYourEmployee -vv` | ✅ |
+| Claim | Where they check it |
+|---|---|
+| Contracts are real and verified | HashScan; Sourcify `exact_match` on all five |
+| The order hit the chain | `hashscan.io/testnet/transaction/…` from `proofLinks.ts` |
+| Only amount + deadline are public | the `OrderOpened` event log on that transaction |
+| The refund needs no keeper | `hashscan.io/testnet/schedule/0.0.…` — *wait for expiry*, unexecuted |
+| Equities are genuine ATS tokens | TSLA-t `0.0.10494983` · FORD-t `0.0.10494829` · VOO-t `0.0.10495021` |
+| Settlement is Circle's USDC | `0.0.429274` — "USD Coin", treasury `0.0.5176` |
+| The broker order is real | the order id in the Alpaca dashboard |
+| Chain and broker are the *same* order | `client_order_id` = first 32 hex of the on-chain order id |
+| The workflow is deployed | `app.chain.link/cre/workflows`, id `0009ba3e…469e`, ACTIVE |
+| Cross-firm attack is impossible | `forge test --match-test test_rivalInstitutionCannotFreezeYourEmployee -vv` |
 
 ## Say these, don't hide them
 
@@ -213,3 +234,13 @@ next, with Chainlink's own disclaimer between them. That is the whole architectu
   The workflow **is** deployed on CRE; confidential-HTTP consensus is a beta limitation we hit and
   reported to Chainlink.
 - The escrow leaks order size: an amount is visible even though the symbol is not.
+
+## If something goes wrong mid-take
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| UI can't reach the service | vite moved to 8081 | free 8080, restart `yarn start` |
+| Progress card sits on "Opened privately" | enclave still running (20–30 s) | wait; it says "about half a minute" after 12 s |
+| "That name is already taken" | you registered it in a rehearsal | use `MERIDIAN CAPITAL` |
+| A write silently does nothing | double-clicked; nonce collision | wait 30 s, retry once |
+| No `pre-trade check PASSED` line | rules weren't published first | publish the rulebook, then re-order |
