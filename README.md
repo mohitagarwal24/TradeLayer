@@ -213,7 +213,8 @@ Contracts are deployed and wired, and the backend is hosted:
 curl https://tradelayer-backend.onrender.com/health
 ```
 
-Locally — see **[DEMO.md](DEMO.md)** for the full runbook, **[DEPLOY.md](DEPLOY.md)** for hosting:
+Locally — see **[docs/guides/running-locally.md](docs/guides/running-locally.md)** for the full
+runbook, **[DEPLOY.md](DEPLOY.md)** for hosting:
 
 ```bash
 cd backend && npm start     # intake + relayer + chain narration — keep this on screen

@@ -130,7 +130,7 @@ curl -X POST https://tradelayer-backend.onrender.com/relay -d '{}'   # 401 — t
 All three verified green on 2026-09-12.
 
 Open the Vercel URL, connect a wallet on Hedera testnet, and walk the flow in
-[DEMO.md](DEMO.md).
+[docs/guides/running-locally.md](docs/guides/running-locally.md).
 
 ---
 
