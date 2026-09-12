@@ -45,6 +45,10 @@ export const config = {
     secret: process.env.ALPACA_DATA_SECRET ?? "",
   },
 
+  /// Shared secret the enclave sends with every relay call. Empty means the endpoint is open,
+  /// which is acceptable on localhost and never in a deployment.
+  relayAuthToken: optional("RELAY_AUTH_TOKEN", ""),
+
   /// Address the enclave signs with. The relayer refuses anything else before spending gas.
   enclaveSigner: required("ENCLAVE_SIGNER"),
   /// Hot key that pays for transactions. It can only relay enclave-signed authorizations.

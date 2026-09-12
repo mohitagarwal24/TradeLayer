@@ -52,7 +52,13 @@ import {
 const USDC_DECIMALS = 6n;
 const ONE_USDC = 10n ** USDC_DECIMALS;
 
-type Secrets = { intentKey: Uint8Array; masterKey: Uint8Array; signingKey: Uint8Array; broker: BrokerCreds };
+type Secrets = {
+  intentKey: Uint8Array;
+  masterKey: Uint8Array;
+  signingKey: Uint8Array;
+  broker: BrokerCreds;
+  relayToken: string;
+};
 
 function loadSecrets(runtime: TeeRuntime<Config>): Secrets {
   const get = (id: string) => runtime.getSecret({ id }).result().value;
@@ -61,6 +67,7 @@ function loadSecrets(runtime: TeeRuntime<Config>): Secrets {
     masterKey: fromHex(get("LEDGER_MASTER_KEY")),
     signingKey: fromHex(get("ENCLAVE_SIGNING_KEY")),
     broker: { keyId: get("ALPACA_KEY_ID"), secret: get("ALPACA_SECRET_KEY") },
+    relayToken: get("RELAY_AUTH_TOKEN"),
   };
 }
 
@@ -114,7 +121,7 @@ export function onIntake(runtime: TeeRuntime<Config>, payload: HTTPPayload): Int
 
   const reject = (reason: string): IntakeResult => {
     runtime.log(`H1 ${short}: rejected (${reason})`);
-    const result = relay(runtime, cfg.relayerUrl, authorizeCancel(s, orderId));
+    const result = relay(runtime, cfg.relayerUrl, authorizeCancel(s, orderId), secrets.relayToken);
     return { orderId, status: "REJECTED", reason, relay: result.status };
   };
 
@@ -198,7 +205,7 @@ export function onIntake(runtime: TeeRuntime<Config>, payload: HTTPPayload): Int
   };
   const blobs = encodePortfolio(aKey, next, entry.version + 1n, fromHex(orderId));
   const auth = authorizeLedgerUpdate(s, accountId, blobs.enclaveBlob, blobs.userBlob, entry.version);
-  const result = relay(runtime, cfg.relayerUrl, auth);
+  const result = relay(runtime, cfg.relayerUrl, auth, secrets.relayToken);
   runtime.log(`H1 ${short}: placed; ledger v${entry.version + 1n} relay ${result.status}`);
 
   return { orderId, status: "PLACED", relay: result.status, txHash: result.txHash };
@@ -233,7 +240,7 @@ export function onReconcile(runtime: TeeRuntime<Config>, _payload: CronPayload):
 
       const broker = getOrderByClientId(runtime, cfg.broker, secrets.broker, orderId);
       if (["canceled", "expired", "rejected"].includes(broker.status)) {
-        const result = relay(runtime, cfg.relayerUrl, authorizeCancel(s, orderId));
+        const result = relay(runtime, cfg.relayerUrl, authorizeCancel(s, orderId), secrets.relayToken);
         summary.push({ orderId: short, action: "cancel", relay: result.status });
         continue;
       }
@@ -264,7 +271,7 @@ export function onReconcile(runtime: TeeRuntime<Config>, _payload: CronPayload):
         openOrders: nextOpen,
       };
       const blobs = encodePortfolio(aKey, next, entry.version + 1n, fromHex(orderId));
-      const result = relay(runtime, cfg.relayerUrl, authorizeSettlement(s, orderId, spent, blobs.enclaveBlob, blobs.userBlob, entry.version));
+      const result = relay(runtime, cfg.relayerUrl, authorizeSettlement(s, orderId, spent, blobs.enclaveBlob, blobs.userBlob, entry.version), secrets.relayToken);
       summary.push({ orderId: short, action: "settle", relay: result.status });
       // Supply is deliberately NOT moved here. Minting per fill would let an observer line up a
       // supply change with one escrow release; H3 nets every fill across every institution
@@ -298,7 +305,7 @@ export function onBatch(runtime: TeeRuntime<Config>, _payload: CronPayload): Bat
 
     if (held > supply) {
       const amount = held - supply;
-      const result = relay(runtime, cfg.relayerUrl, authorizeAtsDelta(s, "atsMint", symbol, amount, supply));
+      const result = relay(runtime, cfg.relayerUrl, authorizeAtsDelta(s, "atsMint", symbol, amount, supply), secrets.relayToken);
       if (result.status !== "confirmed") reserveOk = false;
       deltas.push({ symbol, delta: `+${amount}`, relay: result.status });
       continue;
@@ -311,7 +318,7 @@ export function onBatch(runtime: TeeRuntime<Config>, _payload: CronPayload): Bat
     const inVault = readAtsVaultBalance(runtime, cfg.hedera, symbol);
     const burnable = excess < inVault ? excess : inVault;
     if (burnable > 0n) {
-      const result = relay(runtime, cfg.relayerUrl, authorizeAtsDelta(s, "atsBurn", symbol, burnable, supply));
+      const result = relay(runtime, cfg.relayerUrl, authorizeAtsDelta(s, "atsBurn", symbol, burnable, supply), secrets.relayToken);
       if (result.status !== "confirmed") reserveOk = false;
       deltas.push({ symbol, delta: `-${burnable}`, relay: result.status });
     }
@@ -404,7 +411,7 @@ export function onPolicy(runtime: TeeRuntime<Config>, payload: HTTPPayload): Pol
 
   // 4. Re-encrypt under the org key and sign the write.
   const blob = encodePolicy(orgKey(secrets.masterKey, bytes32(orgId)), submission.policy, current.version + 1n);
-  const result = relay(runtime, cfg.relayerUrl, authorizePolicyUpdate(s, orgId, blob, current.version));
+  const result = relay(runtime, cfg.relayerUrl, authorizePolicyUpdate(s, orgId, blob, current.version), secrets.relayToken);
   runtime.log(`H4 ${orgId}: policy v${current.version + 1n} relay ${result.status}`);
 
   return {

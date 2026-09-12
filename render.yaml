@@ -1,0 +1,73 @@
+# Render blueprint for the TradeLayer backend.
+#
+# The backend cannot be a serverless function. It polls the chain to narrate events, it sequences
+# nonces for a single relayer hot key, and it keeps order state on disk — none of which survive an
+# execution model that starts and stops per request.
+#
+# The free instance sleeps after 15 minutes idle and takes 30-60s to wake. The enclave calls
+# /relay to settle, so a sleeping backend would meet a cold start mid-settlement. Keep it awake
+# with an external cron (cron-job.org, UptimeRobot) hitting /health every 10 minutes: 24/7 is
+# ~744 hours a month against the 750-hour free allowance, so one service fits.
+services:
+  - type: web
+    name: tradelayer-backend
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: CHAIN_ID
+        value: "296"
+      - key: RPC_URL
+        value: https://testnet.hashio.io/api
+      - key: SYMBOLS
+        value: F,TSLA,VOO
+      - key: PORT
+        value: "8000"
+      # Free instances have no persistent disk, so order state here is ephemeral. The chain is the
+      # real record; this only affects the local envelope and relay-receipt cache.
+      - key: DATA_DIR
+        value: /tmp/tradelayer
+      - key: RELAY_GAS_LIMIT
+        value: "4000000"
+      - key: WATCH_POLL_MS
+        value: "8000"
+      # `simulate` shells out to the cre CLI and cannot work here. A deployed backend must use the
+      # CRE gateway, which needs the workflow deployed first.
+      - key: TRIGGER_MODE
+        value: gateway
+      # --- set these in the Render dashboard, not here ---
+      - key: ORDER_ESCROW
+        sync: false
+      - key: CONFIDENTIAL_LEDGER
+        sync: false
+      - key: OMNIBUS_VAULT
+        sync: false
+      - key: ORG_WALLET_REGISTRY
+        sync: false
+      - key: COMPLIANCE_ROUTER
+        sync: false
+      - key: ENCLAVE_SIGNER
+        sync: false
+      - key: RELAYER_PRIVATE_KEY
+        sync: false
+      - key: INTENT_PUBKEY
+        sync: false
+      - key: RELAY_AUTH_TOKEN
+        sync: false
+      - key: CRE_GATEWAY_URL
+        sync: false
+      - key: CRE_WORKFLOW_ID
+        sync: false
+      - key: ALPACA_DATA_KEY_ID
+        sync: false
+      - key: ALPACA_DATA_SECRET
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false

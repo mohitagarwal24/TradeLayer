@@ -136,6 +136,17 @@ async function submit(auth: Authorization, digest: string, target: keyof typeof 
 }
 
 export async function relayHandler(req: Request, res: Response) {
+  // Once hosted this endpoint is publicly reachable and every call it accepts costs HBAR. The
+  // shared token is not a security boundary — a forged authorization still dies at the contract's
+  // signature check — it just stops a passer-by burning the relayer's gas. Unset means open,
+  // which is fine locally and must not be the case in a deployment.
+  const expected = config.relayAuthToken;
+  if (expected && req.get("x-tradelayer-relay-token") !== expected) {
+    log("warn", "relay call without the shared token — refusing before spending gas");
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+
   const parsed = authorizationSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid authorization", issues: parsed.error.issues });
