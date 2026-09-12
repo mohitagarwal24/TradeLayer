@@ -35,12 +35,20 @@ Two things must be true before this works:
   simulation — a deployed workflow rejects unauthorised HTTP triggers. The intake API signs its
   requests, so its address goes in the list.
 - **`relayerUrl` must be publicly reachable.** A DON-hosted enclave cannot POST to `localhost`.
-  Point it at the Render URL from step 2, which means step 2 comes first in practice even though
-  the workflow is the blocker.
+  Done — `config.testnet.json` points at the Render service. Note this also means a local
+  `cre workflow simulate` now relays through the hosted backend, so the hosted relayer key is the
+  one that spends the gas.
+
+`cre secrets create` reads `cre/secrets.yaml`, which maps `RELAY_AUTH_TOKEN` to
+`CRE_RELAY_AUTH_TOKEN` in `cre/.env`. That value must equal `RELAY_AUTH_TOKEN` on Render or every
+relay call comes back 401.
 
 Keep the workflow id it prints — the backend needs it as `CRE_WORKFLOW_ID`.
 
 ## 2. Backend on Render
+
+**Already live:** <https://tradelayer-backend.onrender.com>. The rest of this section is how it
+got there, and what to redo if the service is recreated.
 
 `render.yaml` is a blueprint: **New → Blueprint**, point it at the repo, and Render reads it.
 
@@ -59,7 +67,7 @@ Set the secret values in the dashboard (they are marked `sync: false` so they ne
 
 **Then add a keep-alive.** Free instances sleep after 15 minutes and take 30–60s to wake. The
 enclave calls `/relay` to settle, so a sleeping backend meets a cold start mid-settlement. Point
-[cron-job.org](https://cron-job.org) at `https://<your-service>.onrender.com/health` every 10
+[cron-job.org](https://cron-job.org) at `https://tradelayer-backend.onrender.com/health` every 10
 minutes. Running 24/7 is ~744 hours a month against the 750-hour allowance — one service fits.
 
 Two free-tier limits worth knowing: **no persistent disk**, so `DATA_DIR` is ephemeral and the
@@ -72,20 +80,22 @@ Import the repo, set **Root Directory** to `packages/nextjs`. `vercel.json` supp
 including the rewrite that makes `/institution`, `/trade` and `/positions` work — without it a
 refresh on any of them 404s.
 
-One environment variable:
+`VITE_BACKEND_URL` is already baked into `vercel.json` as `build.env`, so there is nothing to set
+in the dashboard — the repo alone builds against the live backend. Override it in project settings
+only if the backend URL changes.
 
-```
-VITE_BACKEND_URL = https://<your-service>.onrender.com
-```
-
-Then set `FRONTEND_ORIGIN` on Render to the Vercel URL and redeploy the backend.
+Then set `FRONTEND_ORIGIN` on Render to the Vercel URL and redeploy the backend. **The app will not
+work until you do** — it is `http://localhost:8080` today, and CORS rejects every other origin.
 
 ## 4. Check it
 
 ```bash
-curl https://<service>.onrender.com/health      # contracts + symbols, chainId 296
-curl https://<service>.onrender.com/market      # live prices
+curl https://tradelayer-backend.onrender.com/health   # contracts + symbols, chainId 296
+curl https://tradelayer-backend.onrender.com/market   # live prices from Alpaca
+curl -X POST https://tradelayer-backend.onrender.com/relay -d '{}'   # 401 — the token is enforced
 ```
+
+All three verified green on 2026-09-12.
 
 Open the Vercel URL, connect a wallet on Hedera testnet, and walk the flow in
 [DEMO.md](DEMO.md).

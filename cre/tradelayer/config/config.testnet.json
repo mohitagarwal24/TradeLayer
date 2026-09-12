@@ -15,7 +15,7 @@
       "VOO": "0x4761355322501c098d3b0dc9b9cbbfc2d77b766a"
     }
   },
-  "relayerUrl": "http://localhost:8000/relay",
+  "relayerUrl": "https://tradelayer-backend.onrender.com/relay",
   "broker": {
     "baseUrl": "https://paper-api.alpaca.markets"
   },

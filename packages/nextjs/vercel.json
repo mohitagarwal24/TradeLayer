@@ -3,6 +3,11 @@
   "buildCommand": "yarn build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "build": {
+    "env": {
+      "VITE_BACKEND_URL": "https://tradelayer-backend.onrender.com"
+    }
+  },
   "rewrites": [
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ]
