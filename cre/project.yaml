@@ -10,3 +10,8 @@ testnet-settings:
   rpcs:
     - chain-name: ethereum-testnet-sepolia
       url: https://ethereum-sepolia-rpc.publicnode.com
+    # The CLI builds a Workflow Registry client before it looks at `deployment-registry`, and the
+    # registry's canonical chain is Ethereum mainnet. A read-only public endpoint satisfies that;
+    # with `deployment-registry: private` no transaction is ever sent here.
+    - chain-name: ethereum-mainnet
+      url: https://ethereum-rpc.publicnode.com

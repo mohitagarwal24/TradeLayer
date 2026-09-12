@@ -62,6 +62,21 @@ relay call comes back 401.
 
 Keep the workflow id it prints — the backend needs it as `CRE_WORKFLOW_ID`.
 
+**Deployed 2026-09-12.** What the run actually taught us:
+
+| | |
+|---|---|
+| Registry | `private` — no wallet, no gas. The default is the **onchain** registry, which registers on Ethereum *mainnet* and wants real ETH. Sepolia is irrelevant despite the CLI shipping a Sepolia registry address. |
+| Gateway | `https://01.gateway.zone-a.cre.chain.link` — verified by `scripts/pingGateway.ts`. The docs name an `enterprise-gateway` host for private-registry workflows; that one answers *"workflow not found"*. Ask, don't assume. |
+| Secrets | `--secrets-auth browser`. The default `onchain` mode demands a linked wallet key and mainnet gas, and files secrets under the wallet address — but a private-registry workflow's owner is the **org** identity, so they would land in a namespace the workflow never reads. |
+| Workflow id | `0009ba3eb7bc81d5ecea0661b377cba10e823d9c3d3c933725b1049b2f62469e` |
+
+The browser auth opens a single-use `request_uri` that expires in about a minute and starts a
+local callback server on `:53682`. Under WSL it launches a Linux browser with no Chainlink
+session, which *consumes* the URI and leaves you with `invalid_request_uri: request_uri not
+found`. Point `xdg-open` at the Windows browser instead, and make sure no earlier `cre` process
+still holds `:53682` — a stale listener silently swallows the redirect.
+
 ## 2. Backend on Render
 
 **Already live:** <https://tradelayer-backend.onrender.com>. The rest of this section is how it
