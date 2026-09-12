@@ -121,100 +121,114 @@ camera.
 
 ## The script · 2:30
 
-### 0:00 – 0:14 · The problem
-*App landing page.*
+**Delivery.** Talk *while* you click, not before or after. Short sentences, contractions, and let
+the screen do half the work — if the terminal already says it, point at it instead of reading it
+out. Word counts are a pacing guide at ~150 wpm; being under is fine, being over means rushing.
 
-> "Put an institution's trading on a public blockchain and you publish its order flow, its
-> positions and its size — to competitors, and to anyone who wants to trade ahead of it.
-> TradeLayer removes that exposure without handing trust to a server."
+---
 
-### 0:14 – 0:34 · Found a firm, fund a treasury
-*Create an institution → "NORTHWIND CAPITAL" → sign. Then fund with 25 USDC.*
+### 0:00 – 0:14 · The problem · ~32 words
+*Landing page.*
 
-> "Anyone can found an institution — this is happening live, on Hedera testnet, right now. It gets
-> one pooled treasury in Circle's USDC. Not a token we minted: Circle's, used as-is."
+> "If an institution trades on a public blockchain, everyone can see it. Their orders, their
+> positions, how big they are. Competitors included.
+>
+> TradeLayer keeps all of that private. And you don't have to trust us to do it."
 
-*Terminal shows `institution "NORTHWIND CAPITAL" registered` and `treasury funded with 25.0 USDC`.*
+### 0:14 – 0:34 · Found a firm, fund it · ~40 words
+*Create an institution → "NORTHWIND CAPITAL" → sign. Then fund 25 USDC.*
 
-### 0:34 – 0:52 · Membership takes two signatures
-*Switch MetaMask to the employee → "Ask to join". Switch back to admin → Approve.*
+> "So let me set one up. I'll call it Northwind Capital, and sign.
+>
+> That's live on Hedera testnet, right now.
+>
+> Now I'll fund its treasury. Twenty-five USDC — that's Circle's actual stablecoin. We didn't mint
+> a token for this."
 
-> "Membership needs both sides. The employee proposes from their own wallet, the admin approves
-> from theirs. A wallet belongs to exactly one institution — which is what makes it **impossible**
-> for one firm to touch another firm's people, rather than merely against the rules."
+### 0:34 – 0:52 · Getting a trader in · ~42 words
+*Switch to the employee → "Ask to join". Switch back to admin → Approve.*
 
-### 0:52 – 1:08 · Compliance lives in the token — *tabs 4 and 5*
+> "Next I need someone to trade. I'll switch to their wallet and ask to join…
+>
+> …then back to the admin to approve it.
+>
+> Both sides have to sign. And a wallet only ever belongs to one firm — so another institution
+> can't reach my people. Not 'shouldn't'. Can't."
+
+### 0:52 – 1:08 · Compliance is in the token · ~44 words — *tabs 4 and 5*
 *Click Admit. Then HashScan TSLA-t, then the ATS studio.*
 
-> "Admitting someone isn't a flag in our database. It's written into the **equity token itself** —
-> issued through Hedera's Asset Tokenization Studio, with KYC and a control list built in."
+> "Now I admit them on the equities. This isn't a flag in our database — it goes into the token
+> itself.
+>
+> These are real ATS equities. Here's Tesla, in Hedera's own tokenization studio. KYC, control
+> list, built right in. If I suspend someone, the token turns them away. We're not in the loop."
 
-*Tab 5 — the ATS studio:*
-
-> "This is Hedera's own app, not ours. Suspend someone here and the token refuses them. We're not
-> in the loop."
-
-### 1:08 – 1:22 · The private rulebook
+### 1:08 – 1:22 · The rulebook · ~38 words
 *Rules card: limit per order, who may trade, restricted symbols → Seal and publish.*
 
-> "The admin's limits — who trades, how much per order, which stocks are off-limits — are
-> encrypted in the browser before they leave it. Checked on every order, and they cannot be read
-> back. Not by us. Not even by the admin who wrote them."
+> "Last thing as the admin — the rules. Who can trade. How much per order. What's off limits.
+>
+> These get encrypted right here, in the browser. Every order gets checked against them. And
+> nobody can read them back. Not us. Not even me."
 
-### 1:22 – 1:40 · The order
+### 1:22 – 1:40 · Placing the order · ~44 words
 *Switch to the employee wallet. $5 on TSLA. Place sealed order.*
 
-> "This wallet holds **no** company money — check it, it has zero USDC. The escrow draws from the
-> firm's treasury directly. Traders get authority, not custody. That's how a real desk works."
+> "Now I'm the employee. And look — this wallet has no company money in it. Zero.
+>
+> I'll put five dollars into Tesla. The order gets sealed before it leaves my browser, and the
+> firm's treasury funds it directly.
+>
+> Traders get authority, not custody. That's how a real desk works."
 
-### 1:40 – 1:58 · The proof, in the terminal — *full-screen it*
+### 1:40 – 1:58 · What the backend can't see · ~48 words — *full-screen the terminal*
 
-> "The backend receives ciphertext and holds no key that can open it. It says so itself."
+> "Now watch the terminal.
+>
+> The order's arrived — but only as ciphertext. It even says so: no key here can open this."
 
-*Point at the `intake` block — ephemeral key, nonce, byte count.*
+*Point at the `intake` block.*
 
-> "It's opened only inside a Chainlink Confidential Workflow on AWS Nitro. Same bytes — readable
-> there and nowhere else. It checks the firm's private rules, then places **one real order** at
-> Alpaca."
+> "It gets opened inside a Chainlink Confidential Workflow, running in an AWS Nitro enclave. Same
+> bytes. Readable there, and nowhere else.
+>
+> It checks my firm's rules… and places one real order at Alpaca."
 
-### 1:58 – 2:12 · The fill and the settlement
+### 1:58 – 2:12 · The fill and the settlement · ~36 words
 *Run H2 in the spare terminal:*
 `cd cre && cre workflow simulate ./tradelayer --target testnet-settings --trigger-index 1 --non-interactive --allow-insecure-rpc`
 
-> "The market is shut this weekend, so I'm **simulating the fill** — at Tesla's real last traded
-> price. Everything past that line is real."
+> "The market's closed this weekend, so I'm simulating the fill — using Tesla's real last traded
+> price. Everything after this line is real.
+>
+> There. Shares credited and the escrow released, in one signed authorization. They can't come
+> apart."
 
-*Terminal: `SIMULATED FILL … using the real last trade for TSLA: $365.485`, then the settlement.*
+### 2:12 – 2:21 · What the chain shows · ~34 words — *tab 8*
+*Paste the **first** transaction URL from `proofLinks.ts` — the `openBuy`. Scroll to its event log.*
 
-> "Shares credited and escrow released in **one signed authorization** — they cannot come apart.
-> The position is written back encrypted. Five USDC left the treasury; the firm now holds
-> 0.0136 of a Tesla share, and only this employee can read that."
-
-### 2:12 – 2:20 · What the chain shows, and what it doesn't — *tab 8*
-*Paste the **first** transaction URL from `proofLinks.ts` — that's the `openBuy`. Scroll to its
-event log.*
-
-> "Here's that order on Hedera. Everything public about it is an amount and a deadline. Not the
-> stock, not the share count, not the price, not who benefits."
+> "Here's that order on Hedera. Look at what's actually public. An amount, and a deadline. That's
+> it. Not the stock. Not the quantity. Not who it's for."
 
 *Then the schedule link.*
 
-> "And when that order opened, the contract scheduled **its own refund** on-chain for the deadline.
-> This one settled first, so it never needed it — but if nothing had filled, the money would have
-> gone back to the treasury on its own. No keeper, no operator, nobody to trust."
+> "And when it opened, the contract booked its own refund. This one settled first — but if nothing
+> had filled, the money comes back by itself. Nobody has to run anything."
 
-### 2:20 – 2:28 · The same order at the broker — *tab 6*
+### 2:21 – 2:27 · The same order at the broker · ~34 words — *tab 6*
 *Search the `client_order_id` from `proofLinks.ts`.*
 
-> "And here's that order at Alpaca — placed for real, and **still sitting queued**, because the
-> market is shut. That's exactly why the fill had to be simulated: the settlement machinery you
-> just watched is real, the one thing I supplied was the fill event. This identifier is the first
-> half of the on-chain order id, so you can carry an ID off the blockchain straight into the
-> broker and find the same trade."
+> "And here it is at Alpaca. Real order, still sitting queued, because the market's shut — that's
+> why I simulated the fill.
+>
+> That ID is the first half of the on-chain order id. You can take it off the blockchain and find
+> it right here."
 
-### 2:28 – 2:30 · Close — *tab 7*
+### 2:27 – 2:30 · Close · ~12 words
+*Tab 7 — the CRE dashboard.*
 
-> "Deployed and live on Chainlink's network. Nothing here is a mock."
+> "Deployed on Chainlink's network. Real contracts, real broker. None of it is mocked."
 
 ---
 
