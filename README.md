@@ -1,9 +1,17 @@
 # TradeLayer
 
-**Confidential trading for institutions — real stocks, bought with crypto, without broadcasting
-the order.**
+<img width="1316" height="578" alt="image" src="https://github.com/user-attachments/assets/85bac0eb-a8a1-4a66-a786-cccd801b8eec" />
+
+GitBook - https://helix-5.gitbook.io/tradelayer  
+PPT - https://drive.google.com/file/d/1B3c3GfzceXX_N0WlIDR1r_Dim4UsEvAJ/view?usp=sharing  
+Technical Demo - https://vimeo.com/1226318363?share=copy&fl=sv&fe=ci  
 
 ---
+### Confidential Trade Flow Diagram
+<img width="1280" height="858" alt="image" src="https://github.com/user-attachments/assets/c5c270c0-f117-415d-ada0-fe42b01e5d49" />
+
+### Institution Onboarding and ATS Flow Diagram
+<img width="4160" height="2557" alt="image" src="https://github.com/user-attachments/assets/f8d3ad51-c5d0-4b0b-9258-391382a2e9f7" />
 
 ## 1. Introduction
 
@@ -180,15 +188,9 @@ infrastructure.
 
 ---
 
-## 6. Architecture & Flow Diagrams
+## 6. Backend Flow Diagram
 
-<!-- TODO: export the three architecture diagrams from the design doc into docs/img/
-     and reference them here, e.g.
-
-     ![Order flow](docs/img/order-flow.jpeg)
-     ![System architecture](docs/img/architecture.jpeg)
-     ![Settlement](docs/img/settlement.jpeg)
--->
+<img width="4160" height="3233" alt="image" src="https://github.com/user-attachments/assets/e0e6d177-4955-4154-b1a8-dff7d36a1e13" />
 
 ---
 
@@ -347,33 +349,3 @@ cd backend && npx tsc --noEmit
 cd backend && npx tsx scripts/checkGatewayJwt.ts   # 15 gateway JWT wire-format checks
 yarn frontend:check-types && yarn frontend:lint && yarn frontend:build
 ```
-
----
-
-## 13. Honest limits
-
-- **Deployed execution is blocked by a Chainlink beta limitation.** Confidential HTTP responses
-  include per-request headers (`date`, `x-request-id`, `cf-ray`), so DON nodes never agree on the
-  bytes and consensus cannot form against any real API. Reported to Chainlink. The enclave
-  therefore runs through `cre workflow simulate` — the same compiled WASM, the same handlers, the
-  real chain and the real broker.
-- TEE trust is hardware-based, not mathematical. We say *hardware-verified* and *trust-minimized*,
-  never *trustless*. Confidentiality covers data, not logic: the workflow code is public.
-- The relayer is a hot key that can only submit enclave-signed structs. It can censor; it cannot
-  forge or read. Every order has an on-chain, self-executing refund that does not depend on it.
-- Batching hides individual fills only at volume. The guarantee that holds regardless is *hidden
-  until filled*: an order cannot be front-run.
-- **The escrow leaks order size.** Locking an exact amount is visible even though the symbol is
-  not. Tracked; the fix is a pre-funded float.
-- Sell flow and share withdrawal are not built yet — buy side only.
-- Paper broker. Cash rebalancing between the USDC reserve and the broker is a manual treasury
-  step.
-
-See **[docs/limits.md](docs/limits.md)** for the full list, including where the implementation
-deliberately diverges from the design document.
-
-## 14. Roadmap
-
-Sell flow and share withdrawal through ATS Clearing · dividends as an ATS corporate action ·
-custom fee schedule on the equities · a slashable operator bond behind the reserve check · the
-pre-funded float that closes the order-size leak.
